@@ -9,12 +9,9 @@ simif_t::simif_t(std::vector<std::string> args, std::string _prefix,  bool _log)
   trace_count = 0;
   trace_len = TRACE_MAX_LEN;
 
-  for (size_t i = 0 ; i < SAMPLE_NUM ; i++) {
-    samples[i] = NULL;
-  }
   last_sample = NULL;
   last_sample_id = 0;
-  sample_split = false;
+  sample_num = SAMPLE_NUM;
 
   profile = false;
   sample_count = 0;
@@ -154,49 +151,49 @@ void simif_t::init() {
       load_mem(filename);
       fprintf(stdout, "[loadmem] done\n");
     }
-    if (arg.find("+split") == 0) sample_split = true;
+    if (arg.find("+samplenum=") == 0) {
+      sample_num = strtol(arg.c_str()+11, NULL, 10);
+    }
     if (arg.find("+profile") == 0) profile = true;
   }
-
   if (profile) sim_start_time = timestamp();
 }
 
 void simif_t::finish() {
   // tail samples
-  if (last_sample != NULL) {
-    if (samples[last_sample_id] != NULL) delete samples[last_sample_id];
-    samples[last_sample_id] = trace_ports(last_sample);
+  if (last_sample) {
+    std::string filename = prefix + "_" + 
+      std::to_string(last_sample_id) + ".sample";
+    std::ofstream file(filename.c_str());
+    file << *trace_ports(last_sample);
+    file.close();
+    delete last_sample;
   }
+
   if (profile) {
     double sim_time = (double) (timestamp() - sim_start_time) / 1000000.0;
-    fprintf(stdout, "Simulation Time: %.3f s, Sample Time: %.3f s, Sample Count: %d\n", 
-                    sim_time, (double) sample_time / 1000000.0, sample_count);
+    fprintf(stdout, "Simulation Time: %.3f s, Sample Time: %.3f s, ",
+                    sim_time, (double) sample_time / 1000000.0);
   }
-  // dump samples
-  std::string filename = prefix + ".sample";
-  // std::ofstream file(filename.c_str());
-  FILE *file = fopen(filename.c_str(), "w");
-  for (size_t i = 0 ; i < SAMPLE_NUM ; i++) {
-    if (sample_split) {
-      // file.close();
-      fclose(file);
-      std::ostringstream oss;
-      oss << prefix << "_" << i << ".sample";
-      // file.open(oss.str());
-      file = fopen(oss.str().c_str(), "w");
-    }
-    if (samples[i] != NULL) { 
-      // file << *samples[i];
-      samples[i]->dump(file);
-      delete samples[i];
-    }
+  fprintf(stdout, "Sample Count: %d\n", sample_count);
+
+  // merge samples
+  std::string outname = prefix + ".sample";
+  std::ofstream out(outname.c_str());
+  for (size_t i = 0 ; i < sample_num ; i++) {
+    std::string filename = prefix + "_" + 
+      std::to_string(i) + ".sample";
+    std::ifstream f(filename.c_str());
+    out << f.rdbuf();
+    f.close();
+    out.flush();
+    std::remove(filename.c_str());
   }
+
   sample_t* snap = read_snapshot();
-  // file << *cntr;
-  snap->dump(file);
+  out << *snap;
   delete snap;
-  // file.close();
-  fclose(file);
+  out.close();
 }
 
 bool simif_t::expect(bool pass, const char *s) {
@@ -212,13 +209,17 @@ void simif_t::step(size_t n) {
   if (t % trace_len == 0) {
     uint64_t start_time = 0;
     size_t record_id = t / trace_len;
-    size_t sample_id = record_id < SAMPLE_NUM ? record_id : rand() % (record_id + 1);
-    if (sample_id < SAMPLE_NUM) {
+    size_t sample_id = record_id < sample_num ? record_id : rand() % (record_id + 1);
+    if (sample_id < sample_num) {
       sample_count++;
       if (profile) start_time = timestamp();
-      if (last_sample != NULL) {
-        if (samples[last_sample_id] != NULL) delete samples[last_sample_id];
-        samples[last_sample_id] = trace_ports(last_sample);
+      if (last_sample) {
+        std::string filename = prefix + "_" + 
+          std::to_string(last_sample_id) + ".sample";
+        std::ofstream file(filename.c_str());
+        file << *trace_ports(last_sample);
+        file.close();
+        delete last_sample;
       }
       last_sample = read_snapshot();
       last_sample_id = sample_id;
