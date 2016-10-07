@@ -94,7 +94,6 @@ object StroberCompiler {
       "TRACE_MAX_LEN"     -> sim.traceMaxLen,
       "MEM_DATA_CHUNK"    -> SimUtils.getChunks(c.io.slave.w.bits.data),
 
-      "SRAM_RESTART_ADDR" -> c.SRAM_RESTART_ADDR,
       "MEM_AR_ADDR"       -> c.AR_ADDR,
       "MEM_AW_ADDR"       -> c.AW_ADDR,
       "MEM_W_ADDR"        -> c.W_ADDR,
@@ -109,12 +108,6 @@ object StroberCompiler {
     c.IN_ADDRS map dumpId addString sb
     c.OUT_ADDRS map dumpId addString sb
     c.genHeader(sb)
-    sb append "enum CHAIN_TYPE {%s,CHAIN_NUM};\n".format(
-      ChainType.values.toList map (t => s"${t.toString.toUpperCase}_CHAIN") mkString ",")
-    sb append "const unsigned CHAIN_SIZE[CHAIN_NUM] = {%s};\n".format(
-      ChainType.values.toList map (t => c.master.io.daisy(t).size) mkString ",")
-    sb append "const unsigned CHAIN_ADDR[CHAIN_NUM] = {%s};\n".format(
-      ChainType.values.toList map c.DAISY_ADDRS mkString ",")
     sb append "const char* const INPUT_NAMES[POKE_SIZE] = {\n%s\n};\n".format(
       c.IN_ADDRS flatMap dumpNames mkString ",\n")
     sb append "const char* const OUTPUT_NAMES[PEEK_SIZE] = {\n%s\n};\n".format(

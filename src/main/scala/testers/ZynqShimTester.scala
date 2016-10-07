@@ -239,15 +239,18 @@ abstract class ZynqShimTester[+T <: SimNetwork](
   }
 
   protected[testers] def readChain(t: ChainType.Value) = {
+    val controller = c.widgets flatMap{case (x: DaisyController) => Some(x)} head
+
+
     val chain = new StringBuilder
-    for (_ <- 0 until chainLoop(t) ; i <- 0 until c.master.io.daisy(t).size) {
+    for (_ <- 0 until chainLoop(t) ; i <- 0 until controller.io.daisy(t).size) {
       t match {
-        case ChainType.SRAM => pokeChannel(c.SRAM_RESTART_ADDR + i, 0)
+        case ChainType.SRAM => writeCR("DaisyChainController", s"SRAM_RESTART_$i", 1)
         case _ =>
       }
       for (_ <- 0 until chainLen(t)) {
         try {
-          chain append intToBin(peekChannel(c.DAISY_ADDRS(t) + i), c.sim.daisyWidth)
+          chain append intToBin(readCR("DaisyChainController", s"${t.toString.toUpperCase}_$i"), c.sim.daisyWidth)
         } catch {
           case e: java.lang.AssertionError =>
             assert(false, s"$t chain not available")
