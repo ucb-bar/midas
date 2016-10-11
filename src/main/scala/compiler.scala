@@ -92,12 +92,7 @@ object StroberCompiler {
       "PEEK_SIZE"         -> c.outs.size,
       "MEM_DATA_BITS"     -> c.arb.nastiXDataBits,
       "TRACE_MAX_LEN"     -> sim.traceMaxLen,
-      "MEM_DATA_CHUNK"    -> SimUtils.getChunks(c.io.slave.w.bits.data),
-
-      "MEM_AR_ADDR"       -> c.AR_ADDR,
-      "MEM_AW_ADDR"       -> c.AW_ADDR,
-      "MEM_W_ADDR"        -> c.W_ADDR,
-      "MEM_R_ADDR"        -> c.R_ADDR
+      "MEM_DATA_CHUNK"    -> SimUtils.getChunks(c.io.slave.w.bits.data)
     )
     val sb = new StringBuilder
     sb append "#ifndef __%s_H\n".format(targetName.toUpperCase)

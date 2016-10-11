@@ -204,13 +204,23 @@ abstract class ZynqShimTester[+T <: SimNetwork](
   }
 
   def writeMem(addr: BigInt, data: BigInt) {
-    pokeChunks(c.AW_ADDR, SimUtils.getChunks(c.io.slave.aw.bits.addr), addr)
-    pokeChunks(c.W_ADDR,  SimUtils.getChunks(c.io.slave.w.bits.data),  data)
+    val w = c.widgets.flatMap {
+      case x: LoadMemWidget => Some(x)
+      case _ => None
+    } head
+
+    writeCR(w, "W_ADDRESS", addr)
+    (0 until w.widthRatio) foreach { i =>
+      writeCR(w, s"W_DATA", data >> BigInt(i*w.cWidth))
+    }
   }
 
-  def readMem(addr: BigInt) = {
-    pokeChunks(c.AR_ADDR, SimUtils.getChunks(c.io.slave.ar.bits.addr), addr)
-    peekChunks(c.R_ADDR,  SimUtils.getChunks(c.io.slave.r.bits.data))
+  def readMem(addr: BigInt): BigInt = {
+    val w = c.widgets flatMap{case (x: LoadMemWidget) => Some(x)} head
+
+    writeCR(w, "R_ADDRESS", addr)
+    (0 until w.widthRatio).foldLeft(BigInt(0))((data, idx) =>
+      data + (readCR(w, "R_DATA") << (idx * w.cWidth)))
   }
 
   private def slowLoadMem(lines: Iterator[String]) {
