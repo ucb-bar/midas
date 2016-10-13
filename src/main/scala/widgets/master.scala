@@ -33,7 +33,7 @@ class EmulationMaster(implicit p: Parameters) extends Widget()(p) {
   Pulsify(genWOReg(io.hostReset, Bool(false), "HOST_RESET"), pulseLength = 4)
   Pulsify(genWOReg(io.simReset, Bool(false), "SIM_RESET"), pulseLength = 1)
 
-  genAndAttachDecoupled(io.step, "STEP")
+  genAndAttachQueue(io.step, "STEP")
   genWOReg(io.traceLen, UInt(128), "TRACELEN")
   genROReg(io.done, UInt(0), "DONE")
 

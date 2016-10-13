@@ -204,13 +204,24 @@ abstract class ZynqShimTester[+T <: SimNetwork](
   }
 
   def writeMem(addr: BigInt, data: BigInt) {
-    pokeChunks(c.AW_ADDR, SimUtils.getChunks(c.io.slave.aw.bits.addr), addr)
-    pokeChunks(c.W_ADDR,  SimUtils.getChunks(c.io.slave.w.bits.data),  data)
+    val w = c.widgets.flatMap {
+      case x: LoadMemWidget => Some(x)
+      case _ => None
+    } head
+
+    writeCR(w, "W_ADDRESS", addr)
+    //Loadmem unit expects MSWs first
+    ((w.widthRatio - 1) to 0 by -1) foreach { i =>
+      writeCR(w, s"W_DATA", data >> BigInt(i*w.cWidth))
+    }
   }
 
-  def readMem(addr: BigInt) = {
-    pokeChunks(c.AR_ADDR, SimUtils.getChunks(c.io.slave.ar.bits.addr), addr)
-    peekChunks(c.R_ADDR,  SimUtils.getChunks(c.io.slave.r.bits.data))
+  def readMem(addr: BigInt): BigInt = {
+    val w = c.widgets flatMap{case (x: LoadMemWidget) => Some(x)} head
+
+    writeCR(w, "R_ADDRESS", addr)
+    (0 until w.widthRatio).foldLeft(BigInt(0))((data, idx) =>
+      data + (readCR(w, "R_DATA") << (idx * w.cWidth)))
   }
 
   private def slowLoadMem(lines: Iterator[String]) {
@@ -239,15 +250,18 @@ abstract class ZynqShimTester[+T <: SimNetwork](
   }
 
   protected[testers] def readChain(t: ChainType.Value) = {
+    val controller = c.widgets flatMap{case (x: DaisyController) => Some(x)} head
+
+
     val chain = new StringBuilder
-    for (_ <- 0 until chainLoop(t) ; i <- 0 until c.master.io.daisy(t).size) {
+    for (_ <- 0 until chainLoop(t) ; i <- 0 until controller.io.daisy(t).size) {
       t match {
-        case ChainType.SRAM => pokeChannel(c.SRAM_RESTART_ADDR + i, 0)
+        case ChainType.SRAM => writeCR("DaisyChainController", s"SRAM_RESTART_$i", 1)
         case _ =>
       }
       for (_ <- 0 until chainLen(t)) {
         try {
-          chain append intToBin(peekChannel(c.DAISY_ADDRS(t) + i), c.sim.daisyWidth)
+          chain append intToBin(readCR("DaisyChainController", s"${t.toString.toUpperCase}_$i"), c.sim.daisyWidth)
         } catch {
           case e: java.lang.AssertionError =>
             assert(false, s"$t chain not available")
