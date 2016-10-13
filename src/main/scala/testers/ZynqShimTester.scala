@@ -210,7 +210,8 @@ abstract class ZynqShimTester[+T <: SimNetwork](
     } head
 
     writeCR(w, "W_ADDRESS", addr)
-    (0 until w.widthRatio) foreach { i =>
+    //Loadmem unit expects MSWs first
+    ((w.widthRatio - 1) to 0 by -1) foreach { i =>
       writeCR(w, s"W_DATA", data >> BigInt(i*w.cWidth))
     }
   }
