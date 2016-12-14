@@ -245,3 +245,88 @@ std::istream& operator>>(std::istream &is, biguint_t& value) {
   value.init_hex(hex.c_str());
   return is;
 }
+
+// None of these bit extraction and setting functions are particularly efficient
+// We should consider moving them out of biguint into an optimized bitpack
+// class that emphasizes fast bit packing
+uint32_t biguint_t::extract_uint32(size_t lsb, size_t msb) {
+  assert(msb >= lsb);
+  assert(msb - lsb < 32);
+  assert(msb < size * UINT_WIDTH);
+  size_t msw = msb / UINT_WIDTH;
+  size_t lsw = lsb / UINT_WIDTH;
+
+  uint32_t result = (data[lsw] >> (lsb % UINT_WIDTH));
+
+  if (lsw != msw) {
+    result |= (data[msw] << (UINT_WIDTH - (lsb % UINT_WIDTH)));
+  }
+  return result;
+}
+
+uint64_t biguint_t::extract_uint64(size_t lsb, size_t msb) {
+  assert(msb >= lsb);
+  assert(msb - lsb < 64);
+  assert(msb < size * UINT_WIDTH);
+  if (msb - lsb >= UINT_WIDTH) {
+    uint64_t msbs = (uint64_t)(extract_uint32(lsb + UINT_WIDTH, msb));
+    return (msbs << 32) | (uint64_t)(extract_uint32(lsb, lsb + UINT_WIDTH - 1));
+  } else {
+    return (uint64_t)extract_uint32(lsb, msb);
+  }
+}
+
+biguint_t biguint_t::extract(size_t lsb, size_t msb) {
+  assert(msb >= lsb);
+  assert(msb < size * UINT_WIDTH);
+  biguint_t subfield = (*this)>>lsb;
+  size_t size = ((msb - lsb) / UINT_WIDTH) + 1;
+  subfield.size = size;
+  subfield.data[size - 1] = subfield.data[size - 1] & make_mask(0, (msb - lsb) % UINT_WIDTH);
+  return subfield;
+}
+
+void biguint_t::set_word_bits(size_t idx, size_t lsb, size_t msb, uint32_t bits) {
+  assert(msb >= lsb);
+  assert(msb < 32);
+  uint32_t mask = make_mask(lsb, msb);
+  data[idx] = (data[idx] & ~mask) |  ((bits << lsb) & mask);
+}
+
+void biguint_t::set_bits(size_t lsb, size_t msb, uint32_t bits) {
+  assert(msb >= lsb);
+  assert(msb - lsb < 32);
+  assert(msb < size * UINT_WIDTH);
+
+  size_t msw = msb / UINT_WIDTH;
+  size_t lsw = lsb / UINT_WIDTH;
+
+  if (msw != lsw) {
+    set_word_bits(lsw, lsb % UINT_WIDTH, UINT_WIDTH - 1, bits);
+    set_word_bits(msw, 0, msb % UINT_WIDTH, (bits >> (UINT_WIDTH - (lsb % UINT_WIDTH))));
+  } else {
+    set_word_bits(lsw, lsb % UINT_WIDTH, msb % UINT_WIDTH, bits);
+  }
+}
+
+void biguint_t::set_bits(size_t lsb, size_t msb, uint64_t bits) {
+  assert(msb - lsb < 64);
+  if (msb - lsb > UINT_WIDTH) {
+    set_bits(lsb, lsb + UINT_WIDTH - 1, (uint32_t)bits);
+    set_bits(lsb + UINT_WIDTH, msb, (uint32_t)(bits >> UINT_WIDTH));
+  } else {
+    set_bits(lsb, msb, (uint32_t)bits);
+  }
+}
+
+void biguint_t::set_bits(size_t lsb, size_t msb, biguint_t& bits) {
+  assert(msb >= lsb);
+  assert((msb - lsb) / UINT_WIDTH + 1 <= bits.size);
+  size_t idx = 0;
+  while (msb - lsb > UINT_WIDTH) {
+    set_bits(lsb, lsb + UINT_WIDTH - 1, bits.data[idx]);
+    lsb += UINT_WIDTH;
+    idx++;
+  }
+  set_bits(lsb, msb, bits.data[idx]);
+}

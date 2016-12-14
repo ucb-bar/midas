@@ -39,6 +39,17 @@ public:
   bool operator==(const biguint_t &that);
   friend std::ostream& operator<<(std::ostream &os, const biguint_t& value);
   friend std::istream& operator>>(std::istream &is, biguint_t& value);
+
+  // Bit extraction
+  uint32_t extract_uint32(size_t lsb, size_t msb);
+  uint64_t extract_uint64(size_t lsb, size_t msb);
+  biguint_t extract(size_t lsb, size_t msb);
+
+  // Subfield assignment
+  void set_bits(size_t lsb, size_t msb, uint32_t bits);
+  void set_bits(size_t lsb, size_t msb, uint64_t bits);
+  void set_bits(size_t lsb, size_t msb, biguint_t& bits);
+
 private:
   void init(const uint32_t value);
   void init(const uint32_t* value, size_t size);
@@ -47,6 +58,9 @@ private:
   void copy_biguint(const biguint_t &that);
   void bit_or(const biguint_t &a, const biguint_t &b);
   void bit_and(const biguint_t &a, const biguint_t &b);
+  // Sets the bits within one storage word of the biguint, given by idx;.
+  // Argument bits will be masked and shifted into alignment
+  void set_word_bits(size_t idx, size_t lsb, size_t msb, uint32_t bits);
   size_t size;
   uint32_t *data;
 };
@@ -69,6 +83,10 @@ inline uint32_t bin_to_dec(const char *bin) {
     bin++;
   }
   return value;
+}
+
+inline uint32_t make_mask(size_t lsb, size_t msb) {
+  return (-1U >> (UINT_WIDTH - msb - 1)) & (-1U << lsb);
 }
 
 #endif // __BIGUINT_H
