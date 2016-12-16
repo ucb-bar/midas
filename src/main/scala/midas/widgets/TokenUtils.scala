@@ -246,7 +246,14 @@ object TokenDefinitionGenerator extends App {
   class DummyContext extends Module {
     val io = IO( new Bundle {} )
     val fw = new PrintWriter(new File("tokens.h"))
+    fw.write("#ifndef __TOKENS_H\n")
+    fw.write("#define __TOKENS_H\n\n")
+    fw.write("#include <cstdlib>\n")
+    fw.write("#include \"biguint.h\"\n\n")
+    // This is a placeholder until we figure out what we want to put here.
+    fw.write("class MidasToken {};\n")
     writeTokenTypesToFile(fw, (AXI4Bundle(AXI4BundleParameters(64, 128, 32))))
+    fw.write("#endif")
     fw.close()
   }
 
