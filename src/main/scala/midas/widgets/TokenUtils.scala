@@ -15,9 +15,9 @@ import java.io.{File, PrintWriter}
 trait MidasToken {
   def cName = this.getClass.getSimpleName
   def getFields = this.getClass.getDeclaredFields.map({ field =>
-    field setAccessible true
-    (field.getName -> field.get(this))
-  }).sortWith { _._1 < _._1}
+      field.setAccessible(true)
+      (field.getName -> field.get(this))
+    }).sortWith { _._1 < _._1}
 }
 
 trait AXI4Token extends MidasToken {
@@ -77,7 +77,7 @@ object TokenUtils {
       require (e.dir != Direction.Unspecified, "Directions on all leaf nodes must be specified")
       if (e.dir == desiredDir) e.getWidth else 0 }
     //I'm unsure about this, specifically around vecs of bundles
-    case v: Vec[_] => v map { getTokenWidth(_, desiredDir) } reduce {_ + _} 
+    case v: Vec[_] => v map { getTokenWidth(_, desiredDir) } reduce {_ + _}
     case b: Bundle => b.elements map { t => getTokenWidth(t._2, desiredDir) } reduce {_ + _}
   }
 
@@ -94,8 +94,7 @@ object TokenUtils {
     // Private members that indicate the width of variable width fields
     val tokenParams = token.getFields.unzip._1
    
-    // Recurses down the bundle creating structs for every new bundle
-    // encountered and instantiating storage types for all elements
+    // Recurses down the bundle creating structs for every new bundle encountered and instantiating storage types for all elements
     def genInnerType(name: String, value: Data): Unit = value match {
       case e: Element => if (e.dir == desiredDir) {
         sb.appendln("%s %s;".format(getStorageType(e), name))
@@ -131,14 +130,14 @@ object TokenUtils {
     sb.indent()
     sb.appendln("private:")
     sb.indent()
-    token.getFields.unzip._1 foreach { field => sb.appendln("int %s;".format(field)) }
+    tokenParams foreach { param => sb.appendln("int %s;".format(param)) }
     sb.append("\n")
     sb.unindent()
     sb.appendln("public:")
     sb.indent()
     // Generate the data fields
     bundle.elements foreach { case (name: String, value: Data) => genInnerType(name, value) }
-    // Generate public methods 
+    // Generate public methods
     sb.appendln("\n")
     genConstructor
     genDestructor
@@ -183,7 +182,7 @@ object TokenUtils {
         }
 
         sb.appendln("token->%s = bits.%s(%d, %d);".format(
-          bundleHier reduceLeft { _ ++ "." ++ _ },
+          bundleHier.mkString("."),
           unpackMethod,
           offset - element.getWidth + 1,
           offset))
@@ -218,7 +217,7 @@ object TokenUtils {
         sb.appendln("bits.set_bits(%d, %d, %s);".format(
           offset - element.getWidth + 1,
           offset,
-          bundleHier reduceLeft { _ ++ "." ++ _ }))
+          bundleHier.mkString(".")))
         offset -= element.getWidth
       }
     }
@@ -246,7 +245,7 @@ object TokenDefinitionGenerator extends App {
 
   class DummyContext extends Module {
     val io = IO( new Bundle {} )
-    val fw = new PrintWriter(new File("generated_tokens"))
+    val fw = new PrintWriter(new File("tokens.h"))
     writeTokenTypesToFile(fw, (AXI4Bundle(AXI4BundleParameters(64, 128, 32))))
     fw.close()
   }
