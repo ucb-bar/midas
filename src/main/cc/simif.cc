@@ -1,5 +1,6 @@
 #include "simif.h"
 #include <fstream>
+#include <algorithm>
 
 simif_t::simif_t() {
   pass = true;
@@ -112,7 +113,7 @@ void simif_t::target_reset(int pulse_start, int pulse_length) {
   poke(reset, 0);
 #ifdef ENABLE_SNAPSHOT
   // flush I/O traces by target resets
-  trace_count = pulse_start + pulse_length;
+  trace_count = std::min((size_t)(pulse_start + pulse_length), tracelen);
   read_traces(NULL);
   trace_count = 0;
 #endif
