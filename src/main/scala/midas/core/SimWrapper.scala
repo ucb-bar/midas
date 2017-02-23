@@ -7,7 +7,6 @@ import junctions.NastiIO
 
 import chisel3._
 import chisel3.util._
-import chisel3.compatibility.throwException
 import cde.{Parameters, Field}
 import SimUtils._
 import scala.collection.immutable.ListMap
@@ -65,7 +64,7 @@ case object ChannelWidth extends Field[Int]
 case object SRAMChainNum extends Field[Int]
 
 class TraceQueueIO[T <: Data](data: => T, val entries: Int) extends QueueIO(data, entries) {
-  val limit = UInt(INPUT, log2Up(entries))
+  val limit = Input(UInt(log2Up(entries).W))
 }
 
 class TraceQueue[T <: Data](data: => T)(implicit p: Parameters) extends Module {
@@ -103,19 +102,19 @@ class TraceQueue[T <: Data](data: => T)(implicit p: Parameters) extends Module {
 }
 
 class ChannelIO(w: Int)(implicit p: Parameters) extends ParameterizedBundle()(p) {
-  val in    = Flipped(Decoupled(UInt(width=w)))
-  val out   = Decoupled(UInt(width=w))
-  val trace = Decoupled(UInt(width=w))
-  val traceLen = UInt(INPUT, log2Up(p(TraceMaxLen)+1))
+  val in    = Flipped(Decoupled(UInt(w.W)))
+  val out   = Decoupled(UInt(w.W))
+  val trace = Decoupled(UInt(w.W))
+  val traceLen = Input(UInt(log2Up(p(TraceMaxLen)+1).W))
 }
 
 class Channel(val w: Int)(implicit p: Parameters) extends Module {
   val io = IO(new ChannelIO(w))
-  val tokens = Module(new Queue(UInt(width=w), p(ChannelLen)))
+  val tokens = Module(new Queue(UInt(w.W), p(ChannelLen)))
   tokens.io.enq <> io.in
   io.out <> tokens.io.deq
   if (p(EnableSnapshot)) {
-    val trace = Module(new TraceQueue(UInt(width=w)))
+    val trace = Module(new TraceQueue(UInt(w.W)))
     trace suggestName "trace"
     // trace is written when a token is consumed
     trace.io.enq.bits  := io.out.bits
@@ -148,12 +147,12 @@ class SimWrapperIO(io: Data, reset: Bool)(implicit val p: Parameters)
   val inChannelNum = getChunks(inputs.unzip._1)
   val outChannelNum = getChunks(outputs.unzip._1)
 
-  val ins = Flipped(Vec(inChannelNum, Decoupled(UInt(width=channelWidth))))
-  val outs = Vec(outChannelNum, Decoupled(UInt(width=channelWidth)))
-  val inT = Vec(if (enableSnapshot) inChannelNum else 0, Decoupled(UInt(width=channelWidth)))
-  val outT = Vec(if (enableSnapshot) outChannelNum else 0, Decoupled(UInt(width=channelWidth)))
+  val ins = Flipped(Vec(inChannelNum, Decoupled(UInt(channelWidth.W))))
+  val outs = Vec(outChannelNum, Decoupled(UInt(channelWidth.W)))
+  val inT = Vec(if (enableSnapshot) inChannelNum else 0, Decoupled(UInt(channelWidth.W)))
+  val outT = Vec(if (enableSnapshot) outChannelNum else 0, Decoupled(UInt(channelWidth.W)))
   val daisy = new DaisyBundle(daisyWidth, sramChainNum)
-  val traceLen = UInt(INPUT, log2Up(traceMaxLen + 1))
+  val traceLen = Input(UInt(log2Up(traceMaxLen + 1).W))
 
   lazy val inMap = genIoMap(inputs)
   lazy val outMap = genIoMap(outputs)
@@ -203,8 +202,8 @@ class SimWrapperIO(io: Data, reset: Bool)(implicit val p: Parameters)
 
 class TargetBox(targetIo: Data) extends BlackBox {
   val io = IO(new Bundle {
-    val clock = Clock(INPUT)
-    val reset = Bool(INPUT)
+    val clock = Input(Clock())
+    val reset = Input(Bool())
     val io = targetIo.cloneType
   })
 }
@@ -213,8 +212,8 @@ class SimBox(simIo: SimWrapperIO)
             (implicit val p: Parameters)
              extends BlackBox with HasSimWrapperParams {
   val io = IO(new Bundle {
-    val clock = Clock(INPUT)
-    val reset = Bool(INPUT)
+    val clock = Input(Clock())
+    val reset = Input(Bool())
     val io = simIo.cloneType
   })
 }
@@ -289,7 +288,7 @@ class SimWrapper(targetIo: Data)
   outChannels foreach (_.io.traceLen := io.traceLen)
 
   // Cycles for debug
-  val cycles = Reg(UInt(width=64))
+  val cycles = Reg(UInt(64.W))
   when (fire) {
     cycles := Mux(target.io.reset, UInt(0), cycles + UInt(1))
   }
