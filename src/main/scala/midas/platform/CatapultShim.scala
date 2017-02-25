@@ -13,13 +13,13 @@ case object SoftRegKey extends Field[SoftRegParam]
 case class SoftRegParam(addrBits: Int, dataBits: Int)
 
 class SoftRegReq(implicit p: Parameters) extends ParameterizedBundle()(p) {
-  val addr = UInt(width=p(SoftRegKey).addrBits)
-  val wdata = UInt(width=p(SoftRegKey).dataBits)
+  val addr = UInt(p(SoftRegKey).addrBits.W)
+  val wdata = UInt(p(SoftRegKey).dataBits.W)
   val wr = Bool()
 }
 
 class SoftRegResp(implicit p: Parameters) extends ParameterizedBundle()(p) {
-  val rdata = UInt(width=p(SoftRegKey).dataBits)
+  val rdata = UInt(p(SoftRegKey).dataBits.W)
 }
 
 class SoftRegBundle(implicit p: Parameters) extends ParameterizedBundle()(p) {
@@ -49,12 +49,12 @@ class CatapultShim(simIo: midas.core.SimWrapperIO)
 
   val sIdle :: sRead :: sWrite :: sWrAck:: Nil = Enum(UInt(), 4)
   val state = RegInit(sIdle)
-  val dataSizeBits = UInt(log2Up(ctrlKey.dataBits/8))
+  val dataSizeBits = log2Up(ctrlKey.dataBits/8).U
   top.io.ctrl.aw.bits := NastiWriteAddressChannel(
-    UInt(0), io.softreg.req.bits.addr << dataSizeBits, dataSizeBits)
+    0.U, io.softreg.req.bits.addr << dataSizeBits, dataSizeBits)
   top.io.ctrl.aw.valid := io.softreg.req.valid && io.softreg.req.bits.wr && state === sIdle
   top.io.ctrl.ar.bits := NastiReadAddressChannel(
-    UInt(0), io.softreg.req.bits.addr << dataSizeBits, dataSizeBits)
+    0.U, io.softreg.req.bits.addr << dataSizeBits, dataSizeBits)
   top.io.ctrl.ar.valid := io.softreg.req.valid && !io.softreg.req.bits.wr && state === sIdle
   top.io.ctrl.w.bits := NastiWriteDataChannel(io.softreg.req.bits.wdata)
   top.io.ctrl.w.valid := state === sWrite
@@ -91,8 +91,8 @@ class CatapultShim(simIo: midas.core.SimWrapperIO)
   }
 
   // Turn off PCIe
-  io.pcie.in.ready := Bool(false)
-  io.pcie.out.valid := Bool(false)
+  io.pcie.in.ready := false.B
+  io.pcie.out.valid := false.B
 
   // TODO: connect top.io.mem to UMI
 }

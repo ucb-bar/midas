@@ -28,7 +28,7 @@ class IOTraceWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
 
   val inputAddrs = bindInputs(inputs, 0)
   val outputAddrs = bindOutputs(outputs, 0)
-  val traceLen = RegInit(UInt(128))
+  val traceLen = RegInit(128.U)
   val traceLenAddr = attach(traceLen, "TRACELEN")
   io.traceLen := traceLen
 

@@ -74,27 +74,27 @@ class TraceQueue[T <: Data](data: => T)(implicit p: Parameters) extends Module {
   val do_enq = io.enq.fire() && !do_flow
   val do_deq = io.deq.fire() && !do_flow
 
-  val maybe_full = RegInit(Bool(false))
-  val enq_ptr = RegInit(UInt(0, log2Up(io.entries)))
-  val deq_ptr = RegInit(UInt(0, log2Up(io.entries)))
+  val maybe_full = RegInit(false.B)
+  val enq_ptr = RegInit(0.U(log2Up(io.entries).W))
+  val deq_ptr = RegInit(0.U(log2Up(io.entries).W))
   val enq_wrap = enq_ptr === io.limit
   val deq_wrap = deq_ptr === io.limit
-  when (do_enq) { enq_ptr := Mux(enq_wrap, UInt(0), enq_ptr + UInt(1)) }
-  when (do_deq) { deq_ptr := Mux(deq_wrap, UInt(0), deq_ptr + UInt(1)) }
+  when (do_enq) { enq_ptr := Mux(enq_wrap, 0.U, enq_ptr + 1.U) }
+  when (do_deq) { deq_ptr := Mux(deq_wrap, 0.U, deq_ptr + 1.U) }
   when (do_enq =/= do_deq) { maybe_full := do_enq }
 
   val ptr_match = enq_ptr === deq_ptr
   val empty = ptr_match && !maybe_full
   val full = ptr_match && maybe_full
-  val atLeastTwo = full || enq_ptr - deq_ptr >= UInt(2)
+  val atLeastTwo = full || enq_ptr - deq_ptr >= 2.U
   do_flow := empty && io.deq.ready
 
   val ram = SeqMem(io.entries, data)
   when (do_enq) { ram.write(enq_ptr, io.enq.bits) }
 
   val ren = io.deq.ready && (atLeastTwo || !io.deq.valid && !empty)
-  val raddr = Mux(io.deq.valid, Mux(deq_wrap, UInt(0), deq_ptr + UInt(1)), deq_ptr)
-  val ram_out_valid = Reg(next = ren)
+  val raddr = Mux(io.deq.valid, Mux(deq_wrap, 0.U, deq_ptr + 1.U), deq_ptr)
+  val ram_out_valid = RegNext(ren)
 
   io.deq.valid := Mux(empty, io.enq.valid, ram_out_valid)
   io.enq.ready := !full
@@ -119,16 +119,16 @@ class Channel(val w: Int)(implicit p: Parameters) extends Module {
     // trace is written when a token is consumed
     trace.io.enq.bits  := io.out.bits
     trace.io.enq.valid := io.out.fire() && trace.io.enq.ready
-    trace.io.limit := io.traceLen - UInt(2)
+    trace.io.limit := io.traceLen - 2.U
     io.trace <> Queue(trace.io.deq, 1, pipe=true)
     // for debugging
-    val trace_count = RegInit(UInt(0, 32))
+    val trace_count = RegInit(0.U(32.W))
     trace_count suggestName "trace_count"
     when (io.trace.fire() =/= trace.io.enq.fire()) {
-      trace_count := Mux(io.trace.fire(), trace_count - UInt(1), trace_count + UInt(1))
+      trace_count := Mux(io.trace.fire(), trace_count - 1.U, trace_count + 1.U)
     }
   } else {
-    io.trace.valid := Bool(false)
+    io.trace.valid := false.B
   }
 }
 
@@ -248,7 +248,7 @@ class SimWrapper(targetIo: Data)
       (implicit channelWidth: Int) = arg match { case (wire, name) =>
     val channels = outChannels slice (off, off + getChunks(wire))
     channels.zipWithIndex foreach {case (channel, i) =>
-      channel.io.in.bits := Mux(reset, UInt(0), wire.asUInt >> UInt(i * channelWidth))
+      channel.io.in.bits := Mux(reset, 0.U, wire.asUInt >> (i * channelWidth))
     }
     off + getChunks(wire)
   }
@@ -274,8 +274,8 @@ class SimWrapper(targetIo: Data)
   // Firing condtion:
   // 1) all input values are valid
   // 2) all output FIFOs are not full
-  fire := (inChannels foldLeft Bool(true))(_ && _.io.out.valid) && 
-          (outChannels foldLeft Bool(true))(_ && _.io.in.ready)
+  fire := (inChannels foldLeft true.B)(_ && _.io.out.valid) && 
+          (outChannels foldLeft true.B)(_ && _.io.in.ready)
  
   // Inputs are consumed when firing conditions are met
   inChannels foreach (_.io.out.ready := fire)
@@ -290,6 +290,6 @@ class SimWrapper(targetIo: Data)
   // Cycles for debug
   val cycles = Reg(UInt(64.W))
   when (fire) {
-    cycles := Mux(target.io.reset, UInt(0), cycles + UInt(1))
+    cycles := Mux(target.io.reset, 0.U, cycles + 1.U)
   }
 } 

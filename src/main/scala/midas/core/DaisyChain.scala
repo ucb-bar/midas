@@ -206,8 +206,8 @@ class SRAMChainControl(implicit p: Parameters) extends DaisyChainModule()(p) {
     io.readIo.out := read
     // With sram reads, turn off io.read.out and keep their values
     when(reset || io.readIo.in.valid) {
-      read.valid := Bool(false)
-      readEnable := Bool(true)
+      read.valid := false.B
+      readEnable := true.B
     }
     when(RegNext(reset || io.readIo.in.valid)) {
       read.bits := io.readIo.in.bits

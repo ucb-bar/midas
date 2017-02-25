@@ -46,10 +46,10 @@ abstract class NastiWidgetBase(implicit p: Parameters) extends MemModel {
   val bBuf  = Module(new Queue(new NastiWriteResponseChannel, 4, flow=true))
 
   def elaborate(stall: Bool,
-                rCycleValid: Bool = Bool(true),
-                wCycleValid: Bool = Bool(true),
-                rCycleReady: Bool = Bool(true),
-                wCycleReady: Bool = Bool(true)) = {
+                rCycleValid: Bool = true.B,
+                wCycleValid: Bool = true.B,
+                rCycleReady: Bool = true.B,
+                wCycleReady: Bool = true.B) = {
     val fire = targetFire && !stall
     fire suggestName "fire"
     io.tNasti.toHost.hReady := fire

@@ -68,7 +68,7 @@ class SatUpDownCounterIO(val n: Int) extends Bundle {
 class SatUpDownCounter(val n: Int) extends Module {
   require(n >= 1)
   val io = IO(new SatUpDownCounterIO(n))
-  val value =  Reg(init=UInt(0, log2Up(n)))
+  val value =  RegInit(0.U(log2Up(n).W))
   io.value := value
   io.full := value >= io.max
   io.empty := value === 0.U
@@ -83,7 +83,7 @@ class SatUpDownCounter(val n: Int) extends Module {
 object SatUpDownCounter {
   def apply(n: Int): SatUpDownCounterIO = {
     val c = (Module(new SatUpDownCounter(n))).io
-    c.max := UInt(n)
+    c.max := n.U
     c.inc := false.B
     c.dec := false.B
     c
