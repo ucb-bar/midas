@@ -4,7 +4,7 @@ package replay
 import firrtl._
 import firrtl.ir._
 import firrtl.Mappers._
-import firrtl.Annotations._
+import firrtl.annotations._
 import midas.passes._
 import midas.passes.MidasTransforms._
 import java.io.{File, FileWriter, Writer}
@@ -49,11 +49,14 @@ private[replay] class SeqMemPathAnalysis(
   }
 }
 
-private[replay] case class StroberAnnotation(t: String, conf: File)
-    extends Annotation with Loose with Unstable {
-  val target = CircuitName(t)
-  def duplicate(n: Named) = this.copy(t=n.name)
-  def transform = classOf[StroberAnalyses]
+object StroberAnnotation {
+  def apply(t: String, conf: File) =
+    Annotation(CircuitName(t), classOf[StroberAnalyses], conf.toString)
+  def unapply(a: Annotation) = a match {
+    case Annotation(CircuitName(t), transform, conf) if transform == classOf[StroberAnalyses] =>
+      Some(CircuitName(t), new File(conf))
+    case _ => None
+  }
 }
 
 private[replay] class StroberAnalyses(dir: File) extends Transform with SimpleRun {
@@ -64,7 +67,7 @@ private[replay] class StroberAnalyses(dir: File) extends Transform with SimpleRu
   def inputForm = MidForm
   def outputForm = MidForm
   def execute(state: CircuitState) = (getMyAnnotations(state): @unchecked) match {
-    case Seq(StroberAnnotation(t, conf)) if t == state.circuit.main =>
+    case Seq(StroberAnnotation(CircuitName(state.circuit.main), conf)) =>
       val seqMems = (MemConfReader(conf) map (m => m.name -> m)).toMap
       CircuitState(runPasses(state.circuit, Seq(
         new TransformAnalysis(childMods, childInsts, instModMap),

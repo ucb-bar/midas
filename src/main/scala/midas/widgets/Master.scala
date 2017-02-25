@@ -9,9 +9,9 @@ import chisel3.util.{Decoupled, Counter, log2Up}
 import cde.{Parameters, Field}
 
 class EmulationMasterIO(implicit p: Parameters) extends WidgetIO()(p){
-  val simReset = Bool(OUTPUT)
-  val done = Bool(INPUT)
-  val step = Decoupled(UInt(width = p(CtrlNastiKey).dataBits))
+  val simReset = Output(Bool())
+  val done = Input(Bool())
+  val step = Decoupled(UInt(p(CtrlNastiKey).dataBits.W))
 }
 
 object Pulsify {
@@ -20,21 +20,23 @@ object Pulsify {
     if (pulseLength > 1) {
       val count = Counter(pulseLength)
       when(in){count.inc()}
-      when(count.value === UInt(pulseLength-1)) {
-        in := Bool(false)
-        count.value := UInt(0)
+      when(count.value === (pulseLength-1).U) {
+        in := false.B
+        count.value := 0.U
       }
     } else {
-      when(in) {in := Bool(false)}
+      when(in) {
+        in := false.B
+      }
     }
   }
 }
 
 class EmulationMaster(implicit p: Parameters) extends Widget()(p) {
   val io = IO(new EmulationMasterIO)
-  Pulsify(genWORegInit(io.simReset, "SIM_RESET", Bool(false)), pulseLength = 4)
+  Pulsify(genWORegInit(io.simReset, "SIM_RESET", false.B), pulseLength = 4)
   genAndAttachQueue(io.step, "STEP")
-  genRORegInit(io.done && ~io.simReset, "DONE", UInt(0))
+  genRORegInit(io.done && ~io.simReset, "DONE", 0.U)
 
   genCRFile()
 

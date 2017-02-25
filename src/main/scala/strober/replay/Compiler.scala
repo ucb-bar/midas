@@ -2,6 +2,7 @@ package strober
 package replay
 
 import firrtl.ir.Circuit
+import firrtl.passes.memlib._
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.util.DynamicVariable
 import scala.reflect.ClassTag
@@ -16,16 +17,16 @@ object Compiler {
     dir.mkdirs
     val confFile = new File(dir, s"${chirrtl.main}.conf")
     val macroFile = new File(dir, s"${chirrtl.main}.macros.v")
-    val annotations = new firrtl.Annotations.AnnotationMap(Seq(
-      firrtl.passes.memlib.InferReadWriteAnnotation(chirrtl.main),
-      firrtl.passes.memlib.ReplSeqMemAnnotation(s"-c:${chirrtl.main}:-o:$confFile"),
+    val annotations = new firrtl.AnnotationMap(Seq(
+      InferReadWriteAnnotation(chirrtl.main),
+      ReplSeqMemAnnotation(s"-c:${chirrtl.main}:-o:$confFile"),
       StroberAnnotation(chirrtl.main, confFile)))
     val verilog = new FileWriter(new File(dir, s"${chirrtl.main}.v"))
     val result = new Compiler(confFile, macroFile) compile (
       firrtl.CircuitState(chirrtl, firrtl.ChirrtlForm, Some(annotations)),
       verilog, Seq(
-        new firrtl.passes.memlib.InferReadWrite,
-        new firrtl.passes.memlib.ReplSeqMem,
+        new InferReadWrite,
+        new ReplSeqMem,
         new StroberAnalyses(dir)))
     genVerilogFragment(chirrtl.main, io, new FileWriter(new File(dir, s"${chirrtl.main}.vfrag")))
     verilog.close

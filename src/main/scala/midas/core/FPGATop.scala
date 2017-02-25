@@ -76,7 +76,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       target := Cat(simIo.getOuts(wire).reverse map (_.bits))
     case (target: Bits, wire: Bits) if wire.dir == INPUT => 
       simIo.getIns(wire).zipWithIndex foreach {case (in, i) =>
-        in.bits := target >> UInt(i * simIo.channelWidth)
+        in.bits := target >> (i * simIo.channelWidth)
       }
     case _ =>
   }
@@ -89,10 +89,10 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     def andReduceChunks(b: Bits): Bool = b.dir match {
       case OUTPUT =>
         val chunks = simIo.getOuts(b)
-        chunks.foldLeft(Bool(true))(_ && _.valid)
+        chunks.foldLeft(true.B)(_ && _.valid)
       case INPUT =>
         val chunks = simIo.getIns(b)
-        chunks.foldLeft(Bool(true))(_ && _.ready)
+        chunks.foldLeft(true.B)(_ && _.ready)
       case _ => throw new RuntimeException("Wire must have a direction")
     }
     // First reduce the chunks for each field; and then the fields themselves
@@ -125,7 +125,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
   }
 
   // Instantiate endpoint widgets
-  defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
+  defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft true.B){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widget = endpoint match {
         case _: SimMemIO =>

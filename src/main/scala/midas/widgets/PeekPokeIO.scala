@@ -27,10 +27,10 @@ trait HasChannels {
 class PeekPokeIOWidgetIO(inNum: Int, outNum: Int)(implicit p: Parameters)
     extends WidgetIO()(p) {
   // Channel width == width of simulation MMIO bus
-  val ins  = Vec(inNum, Decoupled(UInt(width = ctrl.nastiXDataBits)))
-  val outs = Flipped(Vec(outNum, Decoupled(UInt(width = ctrl.nastiXDataBits))))
+  val ins  = Vec(inNum, Decoupled(UInt(ctrl.nastiXDataBits.W)))
+  val outs = Flipped(Vec(outNum, Decoupled(UInt(ctrl.nastiXDataBits.W))))
 
-  val step = Flipped(Decoupled(UInt(width = ctrl.nastiXDataBits)))
+  val step = Flipped(Decoupled(UInt(ctrl.nastiXDataBits.W)))
   val idle = Bool(OUTPUT)
   val tReset = Decoupled(Bool())
 }
@@ -45,21 +45,21 @@ class PeekPokeIOWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
   val io = IO(new PeekPokeIOWidgetIO(numInputChannels, numOutputChannels))
 
   // i = input, o = output tokens (as seen from the target)
-  val iTokensAvailable = RegInit(UInt(0, width = io.ctrl.nastiXDataBits))
-  val oTokensPending = RegInit(UInt(1, width = io.ctrl.nastiXDataBits))
+  val iTokensAvailable = RegInit(0.U(io.ctrl.nastiXDataBits.W))
+  val oTokensPending = RegInit(1.U(io.ctrl.nastiXDataBits.W))
 
   // needs back pressure from reset queues
   val fromHostReady = io.ins.foldLeft(io.tReset.ready)(_ && _.ready)
   val toHostValid = io.outs.foldLeft(io.tReset.ready)(_ && _.valid)
 
-  io.idle := iTokensAvailable === UInt(0) && oTokensPending === UInt(0)
+  io.idle := iTokensAvailable === 0.U && oTokensPending === 0.U
 
   def bindInputs = bindChannels((name, offset) => {
     val channel = io.ins(offset)
     val reg = Reg(channel.bits)
     reg suggestName ("target_" + name)
     channel.bits := reg
-    channel.valid := iTokensAvailable =/= UInt(0) && fromHostReady
+    channel.valid := iTokensAvailable =/= 0.U && fromHostReady
     attach(reg, name)
   }) _
 
@@ -67,18 +67,18 @@ class PeekPokeIOWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
     val channel = io.outs(offset)
     val reg = RegEnable(channel.bits, channel.fire)
     reg suggestName ("target_" + name)
-    channel.ready := oTokensPending =/= UInt(0) && toHostValid
+    channel.ready := oTokensPending =/= 0.U && toHostValid
     attach(reg, name)
   }) _
 
   val inputAddrs = bindInputs(inputs, 0)
   val outputAddrs = bindOutputs(outputs, 0)
 
-  when (iTokensAvailable =/= UInt(0) && fromHostReady) {
-    iTokensAvailable := iTokensAvailable - UInt(1)
+  when (iTokensAvailable =/= 0.U && fromHostReady) {
+    iTokensAvailable := iTokensAvailable - 1.U
   }
-  when (oTokensPending =/= UInt(0) && toHostValid) {
-    oTokensPending := oTokensPending - UInt(1)
+  when (oTokensPending =/= 0.U && toHostValid) {
+    oTokensPending := oTokensPending - 1.U
   }
 
   when (io.step.fire) {
