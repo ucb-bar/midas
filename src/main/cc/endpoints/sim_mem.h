@@ -1,12 +1,9 @@
 #ifndef __SIM_MEM_H
 #define __SIM_MEM_H
 
-#include <unordered_map>
-
 #include "endpoint.h"
 #include "mm.h"
 #include "mm_dramsim2.h"
-
 
 static const size_t MEM_CHUNKS = MEM_DATA_BITS / (8 * sizeof(data_t));
 
@@ -48,24 +45,20 @@ struct sim_mem_data_t {
 
 class sim_mem_t: public endpoint_t<sim_mem_data_t>
 {
-public:
-  sim_mem_t(simif_t* s, int argc, char** argv);
-  void init();
-  void tick();
-  void profile();
+  public:
+    sim_mem_t(simif_t* s, int argc, char** argv);
+    void tick();
 
-  virtual void send(sim_mem_data_t& data);
-  virtual void recv(sim_mem_data_t& data);
-  virtual void delta(size_t t);
-  virtual bool done();
-  virtual bool stall();
+    virtual void send(sim_mem_data_t& data);
+    virtual void recv(sim_mem_data_t& data);
+    virtual void delta(size_t t);
+    virtual bool done();
+    virtual bool stall();
 
-  void write_mem(uint64_t addr, void* data);
+    void write_mem(uint64_t addr, void* data);
 
-private:
-  mm_t* mem;
-  std::unordered_map<std::string, uint32_t> model_configuration;
-  std::ofstream stats_file;
+  private:
+    mm_t* mem;
 };
 
 #endif // __SIM_MEM_H
