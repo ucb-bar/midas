@@ -90,8 +90,29 @@ class NastiRequestSplitter(implicit p: Parameters) extends Module {
 }
 
 
+/* this takes an axi read request and duplicates it (len + 1) times 
+ * for convenience in later stages
+ */
+class NastiWriteRequestSplitter(implicit p: Parameters) extends Module {
+  val io = IO(new Bundle {
+    val write_requests = Flipped(Decoupled(new NastiWriteAddressChannel))
+    val split_write_requests = Decoupled(new NastiWriteAddressChannel)
+  })
 
+  val splitcountReg = Reg(init=UInt(0, width=32))
+  val splitcountRegLast = io.write_requests.bits.len === splitcountReg
+  io.split_write_requests.bits := io.write_requests.bits
+  io.split_write_requests.bits.addr := io.write_requests.bits.addr + (splitcountReg << UInt(3))
+  io.split_write_requests.bits.len := UInt(0) // splitting
+//  io.split_write_requests.bits.user := splitcountRegLast // HACKY way to pass through last signal
 
+  // write_requests.valid, split_write_requests.ready, splitcountRegLast
+  io.write_requests.ready := io.split_write_requests.ready & splitcountRegLast
+  io.split_write_requests.valid := io.write_requests.valid
+
+  val incremented_or_plain = Mux(io.write_requests.valid & io.split_write_requests.ready, splitcountReg + UInt(1), splitcountReg)
+  splitcountReg := Mux(io.write_requests.valid & io.split_write_requests.ready & splitcountRegLast, UInt(0), incremented_or_plain)
+}
 
 /* todo move to firesim */
 class NastiUMIAdapter(implicit p: Parameters) extends Module {
@@ -114,6 +135,11 @@ class NastiUMIAdapter(implicit p: Parameters) extends Module {
   val umireqQ = Module(new Queue(new CatapultMemReq, 2))
   val umirespQ = Module(new Queue(new CatapultMemResp, 2))
 
+  val awQsplit = Module(new Queue(new NastiWriteAddressChannel, 10))
+  val writeSplitter = Module(new NastiWriteRequestSplitter())
+  writeSplitter.io.write_requests <> awQ.io.deq
+  awQsplit.io.enq <> writeSplitter.io.split_write_requests
+
   awQ.io.enq <> io.nastimem.aw
   wQ.io.enq <> io.nastimem.w
   io.nastimem.b <> bQ.io.deq
@@ -131,7 +157,7 @@ class NastiUMIAdapter(implicit p: Parameters) extends Module {
 
 
   // TODO: 
-  // awQ.io.deq  // write addr IN
+  // awQsplit.io.deq  // write addr IN
   // wQ.io.deq   // write data IN
   // bQ.io.enq   // write resp OUT
   //
@@ -144,7 +170,7 @@ class NastiUMIAdapter(implicit p: Parameters) extends Module {
   // handle writes
   def fire_writereq(exclude: Bool, include: Bool*) = {
     val rvs = Seq(
-      awQ.io.deq.valid,
+      awQsplit.io.deq.valid,
       wQ.io.deq.valid,
       bQ.io.enq.ready,
       umireqQwrite.io.enq.ready
@@ -156,21 +182,21 @@ class NastiUMIAdapter(implicit p: Parameters) extends Module {
   val DRAM_BASE = UInt(BigInt("80000000", 16))
 
   when (fire_writereq(null)) {
-    printf("got write value: %x from address 0x%x\n", wQ.io.deq.bits.data, awQ.io.deq.bits.addr)
+    printf("got write value: %x from address 0x%x\n", wQ.io.deq.bits.data, awQsplit.io.deq.bits.addr)
   }
 
   // keep track of:
-//  awQ.io.deq.valid & wQ.io.deq.valid & bQ.io.enq.ready & umireqQwrite.io.enq.ready
-  awQ.io.deq.ready := fire_writereq(awQ.io.deq.valid)
+//  awQsplit.io.deq.valid & wQ.io.deq.valid & bQ.io.enq.ready & umireqQwrite.io.enq.ready
+  awQsplit.io.deq.ready := fire_writereq(awQsplit.io.deq.valid)
   wQ.io.deq.ready := fire_writereq(wQ.io.deq.valid)
   bQ.io.enq.valid := fire_writereq(bQ.io.enq.ready)
   umireqQwrite.io.enq.valid := fire_writereq(umireqQwrite.io.enq.ready)
  
   // lower 6 bits must be zero since we're faking a 512 bit block
-  umireqQwrite.io.enq.bits.addr := (awQ.io.deq.bits.addr - DRAM_BASE) << UInt(3)
+  umireqQwrite.io.enq.bits.addr := (awQsplit.io.deq.bits.addr - DRAM_BASE) << UInt(3)
   umireqQwrite.io.enq.bits.data := wQ.io.deq.bits.data
   umireqQwrite.io.enq.bits.isWrite := UInt(1)
-  bQ.io.enq.bits.id := awQ.io.deq.bits.id
+  bQ.io.enq.bits.id := awQsplit.io.deq.bits.id
   bQ.io.enq.bits.resp := UInt(0) // TODO
   bQ.io.enq.bits.user := UInt(0) // TODO
 
