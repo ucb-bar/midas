@@ -103,8 +103,11 @@ class NastiWriteRequestSplitter(implicit p: Parameters) extends Module {
   val splitcountRegLast = io.write_requests.bits.len === splitcountReg
   io.split_write_requests.bits := io.write_requests.bits
   io.split_write_requests.bits.addr := io.write_requests.bits.addr + (splitcountReg << UInt(3))
-  io.split_write_requests.bits.len := UInt(0) // splitting
-//  io.split_write_requests.bits.user := splitcountRegLast // HACKY way to pass through last signal
+  // this is our hacky way to make sure we only ack the last chunk of a splitted
+  // ack (no matter the len, a write should only get one ack on b)
+  //
+  // later stages will only ack if the len = 0
+  io.split_write_requests.bits.len := Mux(splitcountRegLast, UInt(0), UInt(1))
 
   // write_requests.valid, split_write_requests.ready, splitcountRegLast
   io.write_requests.ready := io.split_write_requests.ready & splitcountRegLast
@@ -187,9 +190,12 @@ class NastiUMIAdapter(implicit p: Parameters) extends Module {
 
   // keep track of:
 //  awQsplit.io.deq.valid & wQ.io.deq.valid & bQ.io.enq.ready & umireqQwrite.io.enq.ready
+  
+  // hacky last ack only handling:
+  val do_ack = awQsplit.io.deq.bits.len === UInt(0)
   awQsplit.io.deq.ready := fire_writereq(awQsplit.io.deq.valid)
   wQ.io.deq.ready := fire_writereq(wQ.io.deq.valid)
-  bQ.io.enq.valid := fire_writereq(bQ.io.enq.ready)
+  bQ.io.enq.valid := fire_writereq(bQ.io.enq.ready, do_ack)
   umireqQwrite.io.enq.valid := fire_writereq(umireqQwrite.io.enq.ready)
  
   // lower 6 bits must be zero since we're faking a 512 bit block
