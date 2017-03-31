@@ -51,7 +51,7 @@ class CatapultConfig extends Config(new Config(
     case SoftRegKey     => SoftRegParam(32, 64)
     case CtrlNastiKey   => NastiParameters(64, 32, 12)
     case NastiKey       => site(CtrlNastiKey)
-    case MemModelKey    => None
+    case SlaveNastiKey  => site(MemNastiKey)
   }) ++ new SimConfig
 )
 
