@@ -322,15 +322,22 @@ class CatapultShim(simIo: midas.core.SimWrapperIO)
     "MEM_WIDTH"          -> p(SlaveNastiKey).dataBits / 8
   ) ++ top.headerConsts
 
-  val nastiumi = Module(new NastiUMIAdapter()(  p alter Map(NastiKey -> p(SlaveNastiKey))     ))
-  val simumimem = Module(new SimUMIMem)
-  
+  val nastiumi = Module(new NastiUMIAdapter()(p alter Map(NastiKey -> p(SlaveNastiKey))))
   nastiumi.io.nastimem <> top.io.mem
-  simumimem.io.req <> nastiumi.io.umireq
-  nastiumi.io.umiresp <> simumimem.io.resp
-  // tie off top level
-  io.umireq.valid := UInt(0)
-  io.umiresp.ready := UInt(0)
+
+  val SIMULATED = false
+  // connect to simumimem for software simulation
+  if (SIMULATED) {
+    val simumimem = Module(new SimUMIMem)
+    simumimem.io.req <> nastiumi.io.umireq
+    nastiumi.io.umiresp <> simumimem.io.resp 
+    // tie off top level
+    io.umireq.valid := UInt(0)
+    io.umiresp.ready := UInt(0)
+  } else {
+    io.umireq <> nastiumi.io.umireq
+    nastiumi.io.umiresp <> io.umiresp
+  }
 
   val sIdle :: sRead :: sWrite :: sWrAck:: Nil = Enum(UInt(), 4)
   val state = RegInit(sIdle)
