@@ -19,7 +19,7 @@ private class MidasCompiler(dir: File, io: Data)(implicit param: config.Paramete
   def emitter = new firrtl.FirrtlEmitter
   def transforms = getLoweringTransforms(firrtl.ChirrtlForm, firrtl.MidForm) ++ Seq(
     new InferReadWrite,
-    new ReplSeqMem,
+    // new ReplSeqMem,
     new passes.MidasTransforms(dir, io)
   )
 }
@@ -34,9 +34,10 @@ private class VerilogCompiler(conf: File) extends firrtl.Compiler {
 object MidasCompiler {
   def apply(chirrtl: Circuit, io: Data, dir: File)(implicit p: config.Parameters): Circuit = {
     val conf = new File(dir, s"${chirrtl.main}.conf")
+    conf.createNewFile
     val annotations = new firrtl.AnnotationMap(Seq(
       InferReadWriteAnnotation(chirrtl.main),
-      ReplSeqMemAnnotation(s"-c:${chirrtl.main}:-o:$conf"),
+      // ReplSeqMemAnnotation(s"-c:${chirrtl.main}:-o:$conf"),
       passes.MidasAnnotation(chirrtl.main, conf)
     ))
     // val writer = new FileWriter(new File("debug.ir"))
