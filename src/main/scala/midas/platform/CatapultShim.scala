@@ -47,6 +47,7 @@ trait CatapultIFParams {
   //
   // the document says 512..
   val UMI_DATA_WIDTH = 576
+  val UMI_DATA_BITS = log2Ceil(512/8)
 
   val SOFTREG_ADDR_WIDTH = 32
   val SOFTREG_DATA_WIDTH = 64
@@ -91,60 +92,8 @@ class SimUMIMem(implicit p: Parameters) extends Module {
   }
 }
 
-/* this takes an axi read request and duplicates it (len + 1) times 
- * for convenience in later stages
- */
-class NastiRequestSplitter(implicit p: Parameters) extends Module {
-  val io = IO(new Bundle {
-    val read_requests = Flipped(Decoupled(new NastiReadAddressChannel))
-    val split_read_requests = Decoupled(new NastiReadAddressChannel)
-  })
-
-  val splitcountReg = Reg(init=UInt(0, width=32))
-  val splitcountRegLast = io.read_requests.bits.len === splitcountReg
-  io.split_read_requests.bits := io.read_requests.bits
-  io.split_read_requests.bits.addr := io.read_requests.bits.addr + (splitcountReg << UInt(3))
-  io.split_read_requests.bits.len := UInt(0) // splitting
-  io.split_read_requests.bits.user := splitcountRegLast // HACKY way to pass through last signal
-
-  // read_requests.valid, split_read_requests.ready, splitcountRegLast
-  io.read_requests.ready := io.split_read_requests.ready & splitcountRegLast
-  io.split_read_requests.valid := io.read_requests.valid
-
-  val incremented_or_plain = Mux(io.read_requests.valid & io.split_read_requests.ready, splitcountReg + UInt(1), splitcountReg)
-  splitcountReg := Mux(io.read_requests.valid & io.split_read_requests.ready & splitcountRegLast, UInt(0), incremented_or_plain)
-}
-
-
-/* this takes an axi read request and duplicates it (len + 1) times 
- * for convenience in later stages
- */
-class NastiWriteRequestSplitter(implicit p: Parameters) extends Module {
-  val io = IO(new Bundle {
-    val write_requests = Flipped(Decoupled(new NastiWriteAddressChannel))
-    val split_write_requests = Decoupled(new NastiWriteAddressChannel)
-  })
-
-  val splitcountReg = Reg(init=UInt(0, width=32))
-  val splitcountRegLast = io.write_requests.bits.len === splitcountReg
-  io.split_write_requests.bits := io.write_requests.bits
-  io.split_write_requests.bits.addr := io.write_requests.bits.addr + (splitcountReg << UInt(3))
-  // this is our hacky way to make sure we only ack the last chunk of a splitted
-  // ack (no matter the len, a write should only get one ack on b)
-  //
-  // later stages will only ack if the len = 0
-  io.split_write_requests.bits.len := Mux(splitcountRegLast, UInt(0), UInt(1))
-
-  // write_requests.valid, split_write_requests.ready, splitcountRegLast
-  io.write_requests.ready := io.split_write_requests.ready & splitcountRegLast
-  io.split_write_requests.valid := io.write_requests.valid
-
-  val incremented_or_plain = Mux(io.write_requests.valid & io.split_write_requests.ready, splitcountReg + UInt(1), splitcountReg)
-  splitcountReg := Mux(io.write_requests.valid & io.split_write_requests.ready & splitcountRegLast, UInt(0), incremented_or_plain)
-}
-
 /* todo move to firesim */
-class NastiUMIAdapter(implicit p: Parameters) extends Module {
+class NastiUMIAdapter(implicit p: Parameters) extends NastiModule with CatapultIFParams {
   val io = IO(new Bundle {
     val nastimem = Flipped(new NastiIO)
     val umireq = Decoupled(new CatapultMemReq)
@@ -153,21 +102,14 @@ class NastiUMIAdapter(implicit p: Parameters) extends Module {
 
   // hide everything behind queues
   val awQ = Module(new Queue(new NastiWriteAddressChannel, 2))
-  val wQ = Module(new Queue(new NastiWriteDataChannel, 2))
+  val wQ = Module(new Queue(new NastiWriteDataChannel, 8))
   val bQ = Module(new Queue(new NastiWriteResponseChannel, 2))
   val arQ = Module(new Queue(new NastiReadAddressChannel, 2))
-  val rQ = Module(new Queue(new NastiReadDataChannel, 2))
+  val rQ = Module(new Queue(new NastiReadDataChannel, 8))
 
-  val umireqQwrite = Module(new Queue(new CatapultMemReq, 2))
-  val umireqQread = Module(new Queue(new CatapultMemReq, 2))
   val umireqQ = Module(new Queue(new CatapultMemReq, 2))
   val umirespQ = Module(new Queue(new CatapultMemResp, 2))
-
-  val awQsplit = Module(new Queue(new NastiWriteAddressChannel, 10))
-  val writeSplitter = Module(new NastiWriteRequestSplitter())
-  writeSplitter.io.write_requests <> awQ.io.deq
-  awQsplit.io.enq <> writeSplitter.io.split_write_requests
-
+ 
   awQ.io.enq <> io.nastimem.aw
   wQ.io.enq <> io.nastimem.w
   io.nastimem.b <> bQ.io.deq
@@ -177,131 +119,122 @@ class NastiUMIAdapter(implicit p: Parameters) extends Module {
   io.umireq <> umireqQ.io.deq
   umirespQ.io.enq <> io.umiresp
 
-  // arbitrate between read/write requests for output port
-  val umirequestArbiter = Module(new RRArbiter(new CatapultMemReq, 2))
-  umireqQ.io.enq <> umirequestArbiter.io.out
-  umirequestArbiter.io.in(0) <> umireqQwrite.io.deq
-  umirequestArbiter.io.in(1) <> umireqQread.io.deq
+  val (sIdle :: sReadReq :: sWait :: sRead ::
+       sWrite :: sWriteReq :: sWriteDone :: Nil) = Enum(UInt(), 7)
+  val state = RegInit(sIdle)
+  val isWr = Reg(Bool())
+  val addr = Reg(UInt(nastiXAddrBits.W))
+  val id = Reg(UInt(nastiXIdBits.W))
+  val len = Reg(UInt(nastiXLenBits.W))
+  val data = Reg(UInt(512.W))
 
-
-  // TODO: 
-  // awQsplit.io.deq  // write addr IN
-  // wQ.io.deq   // write data IN
-  // bQ.io.enq   // write resp OUT
-  //
-  // arQ.io.deq // read addr IN
-  // rQ.io.enq  // read resp OUT
-  //
-  // umireqQwrite.io.enq // umi requests OUT
-  // umirespQ.io.deq // umi resps IN
-
-  // handle writes
-  def fire_writereq(exclude: Bool, include: Bool*) = {
-    val rvs = Seq(
-      awQsplit.io.deq.valid,
-      wQ.io.deq.valid,
-      bQ.io.enq.ready,
-      umireqQwrite.io.enq.ready
-    )
-    (rvs.filter(_ ne exclude) ++ include).reduce(_ && _)
-  }
-
-  // subtract DRAM base from addresses before sending to UMI
   val DRAM_BASE = UInt(BigInt("80000000", 16))
+  val numChunks = 512 / nastiXDataBits
+  val count = Reg(UInt(log2Ceil(numChunks).W))
+  assert(512 % nastiXDataBits == 0)
+  assert(numChunks > 0)
+  assert(isPow2(numChunks))
 
-  when (fire_writereq(null)) {
-    printf("got write value: %x from address 0x%x\n", wQ.io.deq.bits.data, awQsplit.io.deq.bits.addr)
+  val dataSeq = (0 until numChunks) map { i =>
+    val chunk = data((i + 1) * nastiXDataBits - 1, i * nastiXDataBits)
+    val wdata = (0 until nastiWStrobeBits) map { i =>
+      val hi = 8 * (i + 1) - 1
+      val lo = 8 * i
+      Mux(isWr && wQ.io.deq.bits.strb(i), wQ.io.deq.bits.data(hi, lo), chunk(hi, lo))
+    }
+    Mux(count === i.U, Cat(wdata.reverse), chunk)
   }
 
-  // keep track of:
-//  awQsplit.io.deq.valid & wQ.io.deq.valid & bQ.io.enq.ready & umireqQwrite.io.enq.ready
-  
-  // hacky last ack only handling:
-  val do_ack = awQsplit.io.deq.bits.len === UInt(0)
-  awQsplit.io.deq.ready := fire_writereq(awQsplit.io.deq.valid)
-  wQ.io.deq.ready := fire_writereq(wQ.io.deq.valid)
-  bQ.io.enq.valid := fire_writereq(bQ.io.enq.ready, do_ack)
-  umireqQwrite.io.enq.valid := fire_writereq(umireqQwrite.io.enq.ready)
- 
-  // lower 6 bits must be zero since we're faking a 512 bit block
-  umireqQwrite.io.enq.bits.addr := (awQsplit.io.deq.bits.addr - DRAM_BASE) << UInt(3)
-  umireqQwrite.io.enq.bits.data := wQ.io.deq.bits.data
-  umireqQwrite.io.enq.bits.isWrite := UInt(1)
-  bQ.io.enq.bits.id := awQsplit.io.deq.bits.id
-  bQ.io.enq.bits.resp := UInt(0) // TODO
-  bQ.io.enq.bits.user := UInt(0) // TODO
+  arQ.io.deq.ready := state === sIdle
+  awQ.io.deq.ready := state === sIdle
+  wQ.io.deq.ready  := state === sWrite
+  rQ.io.enq.bits := NastiReadDataChannel(id, Vec(dataSeq)(count), !len.orR)
+  rQ.io.enq.valid := state === sRead
+  bQ.io.enq.bits := NastiWriteResponseChannel(id)
+  bQ.io.enq.valid := state === sWriteDone
 
-  // --------------------------------------------------------------------
-  // handle reads
-  //
-  // we have: umireqQread.io.enq
-  // umirespQ.io.deq
-  //
-  // arQ.io.deq
-  // rQ.io.enq
-  val arsplitQ = Module(new Queue(new NastiReadAddressChannel, 20))
-  val splitter = Module(new NastiRequestSplitter())
-  splitter.io.read_requests <> arQ.io.deq
-  arsplitQ.io.enq <> splitter.io.split_read_requests
-  val readInFlightQ = Module(new Queue(new NastiReadAddressChannel, 10))
+  umireqQ.io.enq.bits.addr := (addr >> UMI_DATA_BITS.U) << UMI_DATA_BITS.U
+  umireqQ.io.enq.bits.data := data
+  umireqQ.io.enq.bits.isWrite := state === sWriteReq
+  umireqQ.io.enq.valid := state === sReadReq || state === sWriteReq
+  umirespQ.io.deq.ready := state === sWait
 
-  // two steps:
-  // sending requests:
-  // care about:
-  //  readInFlightQ.io.enq
-  //  arsplitQ.io.deq
-  //  umireqQread.io.enq
-
-
-  def fire_read_stage1(exclude: Bool, include: Bool*) = {
-    val rvs = Seq(
-      readInFlightQ.io.enq.ready,
-      arsplitQ.io.deq.valid,
-      umireqQread.io.enq.ready
-    )
-    (rvs.filter(_ ne exclude) ++ include).reduce(_ && _)
+  switch(state) {
+    is(sIdle) {
+      when(awQ.io.deq.valid) {
+        printf("[nasti aw] addr: 0x%x, id: %d, len: %d\n",
+               awQ.io.deq.bits.addr, awQ.io.deq.bits.id, awQ.io.deq.bits.len)
+        addr  := awQ.io.deq.bits.addr - DRAM_BASE
+        id    := awQ.io.deq.bits.id
+        len   := awQ.io.deq.bits.len
+        isWr  := true.B
+        state := sReadReq
+      }.elsewhen(arQ.io.deq.valid) {
+        printf("[nasti ar] addr: 0x%x, id: %d, len: %d\n",
+               arQ.io.deq.bits.addr, arQ.io.deq.bits.id, arQ.io.deq.bits.len)
+        addr  := arQ.io.deq.bits.addr - DRAM_BASE
+        id    := arQ.io.deq.bits.id
+        len   := arQ.io.deq.bits.len
+        isWr  := false.B
+        state := sReadReq
+      }
+    }
+    is(sReadReq) {
+      when(umireqQ.io.enq.ready) {
+        printf("[umi read req] addr: 0x%x\n", umireqQ.io.enq.bits.addr)
+        state := sWait
+      }
+    }
+    is(sWait) {
+      when(umirespQ.io.deq.valid) {
+        printf("[umi read resp] data: 0x%x\n", umirespQ.io.deq.bits.data)
+        data  := umirespQ.io.deq.bits.data
+        count := addr(log2Ceil(512/8), log2Ceil(nastiXDataBits/8))
+        state := Mux(isWr, sWrite, sRead)
+      }
+    }
+    is(sRead) {
+      when(rQ.io.deq.ready) {
+        printf("[nasti r] id: %d, data: 0x%x, last: %d\n",
+               rQ.io.deq.bits.id, rQ.io.deq.bits.data, rQ.io.deq.bits.last)
+        len := len - 1.U
+        count := count + 1.U
+        when(!len.orR) {
+          state := sIdle
+        }.elsewhen(count === (numChunks - 1).U) {
+          addr  := ((addr >> UMI_DATA_BITS.U) + 1.U) << UMI_DATA_BITS.U
+          state := sReadReq
+        }
+      } 
+    }
+    is(sWrite) {
+      when(wQ.io.deq.valid) {
+        printf("[nasti w] data: 0x%x, strb: 0x%x, last: %d\n",
+               wQ.io.deq.bits.data, wQ.io.deq.bits.strb, wQ.io.deq.bits.last)
+        when(!wQ.io.deq.bits.last) {
+          len := len - 1.U
+        }
+        count := count + 1.U
+        data  := Cat(dataSeq.reverse)
+        when(wQ.io.deq.bits.last || count === (numChunks - 1).U) {
+          state := sWriteReq
+        }
+      } 
+    }
+    is(sWriteReq) {
+      when(umireqQ.io.enq.ready) {
+        printf("[umi write req] addr: 0x%x, data: 0x%x\n",
+               umireqQ.io.enq.bits.addr, umireqQ.io.enq.bits.data)
+        addr  := ((addr >> UMI_DATA_BITS.U) + 1.U) << UMI_DATA_BITS.U
+        state := Mux(len.orR, sReadReq, sWriteDone)
+      } 
+    }
+    is(sWriteDone) {
+      when(bQ.io.deq.ready) {
+        state := sIdle
+      }
+    }
   }
-  readInFlightQ.io.enq.valid := fire_read_stage1(readInFlightQ.io.enq.ready)
-  arsplitQ.io.deq.ready := fire_read_stage1(arsplitQ.io.deq.valid)
-  umireqQread.io.enq.valid := fire_read_stage1(umireqQread.io.enq.ready)
-
-  readInFlightQ.io.enq.bits := arsplitQ.io.deq.bits
-  umireqQread.io.enq.bits.addr := (arsplitQ.io.deq.bits.addr - DRAM_BASE) << UInt(3)
-  umireqQread.io.enq.bits.data := UInt(0)
-  umireqQread.io.enq.bits.isWrite := UInt(0)
-
-  // second step:
-  // getting responses:
-  // care about:
-  //  readInFlightQ.io.deq
-  //  rQ.io.enq
-  //  umirespQ.io.deq
-
-  def fire_read_stage2(exclude: Bool, include: Bool*) = {
-    val rvs = Seq(
-      readInFlightQ.io.deq.valid,
-      rQ.io.enq.ready,
-      umirespQ.io.deq.valid
-    )
-    (rvs.filter(_ ne exclude) ++ include).reduce(_ && _)
-  }
-
-  when(fire_read_stage2(null)) {
-    printf("got read value: %x from address 0x%x\n", rQ.io.enq.bits.data, readInFlightQ.io.deq.bits.addr)
-  }
-
-
-  readInFlightQ.io.deq.ready := fire_read_stage2(readInFlightQ.io.deq.valid)
-  rQ.io.enq.valid := fire_read_stage2(rQ.io.enq.ready)
-  umirespQ.io.deq.ready := fire_read_stage2(umirespQ.io.deq.valid)
-
-  rQ.io.enq.bits.id := readInFlightQ.io.deq.bits.id
-  rQ.io.enq.bits.data := umirespQ.io.deq.bits.data(63,0)
-  rQ.io.enq.bits.last := readInFlightQ.io.deq.bits.user
-  rQ.io.enq.bits.resp := UInt(0)
-  rQ.io.enq.bits.user := UInt(0)
-
-  // TODO: stick in an assert for strb
 }
 
 class CatapultShim(simIo: midas.core.SimWrapperIO)
