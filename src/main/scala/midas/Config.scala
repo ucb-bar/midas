@@ -27,11 +27,11 @@ class SimConfig extends Config((site, here, up) => {
   case EndpointKey    => EndpointMap(Seq(new SimNastiMemIO, new SimAXI4MemIO))
   case MemModelKey    => Some((p: Parameters) => new SimpleLatencyPipe()(p))
   case FpgaMMIOSize   => BigInt(1) << 12 // 4 KB
+  case MidasL2Key     => None
 })
 
 class ZynqConfig extends Config(new Config((site, here, up) => {
   case Platform       => Zynq
-  case MidasL2Key     => None
   case MasterNastiKey => site(CtrlNastiKey)
   case SlaveNastiKey  => site(MemNastiKey)
 }) ++ new SimConfig)
@@ -48,7 +48,7 @@ class CatapultConfig extends Config(new Config((site, here, up) => {
   case SoftRegKey     => SoftRegParam(32, 64)
   case CtrlNastiKey   => NastiParameters(64, 32, 12)
   case NastiKey       => site(CtrlNastiKey)
-  case MemModelKey    => None
+  case SlaveNastiKey  => site(MemNastiKey)
 }) ++ new SimConfig)
 
 class CatapultConfigWithSnapshot extends Config(new Config((site, here, up) => {
