@@ -8,7 +8,7 @@ import config.{Parameters, Field}
 case object TraceMaxLen extends Field[Int]
 
 class TraceQueueIO[T <: Data](data: => T, val entries: Int) extends QueueIO(data, entries) {
-  val limit = Input(UInt(width=log2Up(entries)))
+  val limit = Input(UInt(log2Up(entries).W))
 }
 
 class TraceQueue[T <: Data](data: => T)(implicit p: Parameters) extends Module {

@@ -56,10 +56,8 @@ class DaisyBundle(val daisyWidth: Int, sramChainNum: Int) extends Bundle {
     new DaisyBundle(daisyWidth, sramChainNum).asInstanceOf[this.type]
 }
 
-class DaisyBox(implicit p: Parameters) extends BlackBox {
-  val io = IO(new Bundle {
-    val daisy = new DaisyBundle(p(DaisyWidth), p(SRAMChainNum))
-  })
+class DaisyBox(implicit p: Parameters) extends Module {
+  val io = IO(new DaisyBundle(p(DaisyWidth), p(SRAMChainNum)))
 }
 
 // Common structures for daisy chains
