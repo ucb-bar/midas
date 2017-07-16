@@ -23,10 +23,10 @@ private[passes] class SimulationMapping(
     }
 
   private def init(info: Info, target: String, main: String)(m: DefModule) = m match {
-    case m: Module if m.name == main =>
+    case m: Module if m.name == "TargetBoxBundleWrap" =>
       val body = initStmt(target)(m.body)
       val stmts = Seq(
-        Connect(NoInfo, wsub(wref("target"), "targetFire"), wref("fire", BoolType)),
+        Connect(NoInfo, wsub(wref("target"), "targetFire"), wsub(wref("io"), "fire")),
         Connect(NoInfo, wsub(wref("target"), "daisyReset"), wref("reset", BoolType))) ++
       (if (!param(EnableSnapshot)) Nil else Seq(
         Connect(NoInfo, wsub(wref("io"), "daisy"), wsub(wref("target"), "daisy"))))

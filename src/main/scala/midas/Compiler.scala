@@ -1,6 +1,6 @@
 package midas
 
-import chisel3.Data
+import chisel3.{Data, Bundle}
 import firrtl.ir.Circuit
 import firrtl.CompilerUtils.getLoweringTransforms
 import firrtl.passes.memlib._
@@ -51,10 +51,21 @@ object MidasCompiler {
     result.circuit
   }
 
-  def apply[T <: chisel3.Module](w: => T, dir: File)(implicit p: config.Parameters): Circuit = {
+  def apply[T <: chisel3.experimental.RawModule](w: => T, dir: File)(implicit p: config.Parameters): Circuit = {
     dir.mkdirs
     lazy val target = w
     val chirrtl = firrtl.Parser.parse(chisel3.Driver.emit(() => target))
-    apply(chirrtl, target.io, dir)
+
+    class RCBundle extends Bundle {
+        val clock = target.getPorts(0).id.cloneType
+        val reset = target.getPorts(1).id.cloneType
+        val mem_axi4 = target.getPorts(2).id.cloneType
+        val serial = target.getPorts(3).id.cloneType
+
+        override def cloneType = new RCBundle().asInstanceOf[this.type]
+    }
+
+    val rcbundle = new RCBundle
+    apply(chirrtl, rcbundle, dir)
   }
 }

@@ -5,9 +5,11 @@ package core
 import junctions.NastiIO
 import uncore.axi4.AXI4Bundle
 import config.{Parameters, Field}
+import util.HeterogeneousBag
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental._
 import SimUtils._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.{ArrayBuffer, HashSet}
@@ -23,7 +25,8 @@ object SimUtils {
         v.zipWithIndex foreach {case (e, i) => loop(s"${name}_${i}", e)}
       case b: Bits if b.dir == INPUT => inputs += (b -> name)
       case b: Bits if b.dir == OUTPUT => outputs += (b -> name)
-      case _ => // skip
+      case default => 
+        default.asInstanceOf[HeterogeneousBag[uncore.axi4.AXI4Bundle]].elements foreach {case (n, e) => loop(s"${name}_${n}", e)}
     }
     reset match {
       case None =>
@@ -89,6 +92,9 @@ class SimWrapperIO(
         }
         case v: Vec[_] => v.zipWithIndex foreach {
           case (e, i) => findEndpoint(s"${name}_${i}", e)
+        }
+        case h: HeterogeneousBag[uncore.axi4.AXI4Bundle] => h.elements foreach {
+          case (n, e) => findEndpoint(s"${name}_${n}", e)
         }
         case _ =>
       }
@@ -162,12 +168,36 @@ class SimWrapperIO(
     new SimWrapperIO(io, reset).asInstanceOf[this.type]
 }
 
-class TargetBox(targetIo: Data) extends BlackBox {
+
+// this gets replaced with the real target
+class TargetBox(targetIo: Data) extends ExtModule {
+  val origtop = targetIo.cloneType.asInstanceOf[Bundle]
+
+  val mem_axi4 = IO(origtop.elements("mem_axi4").cloneType)
+  val serial = IO(origtop.elements("serial").cloneType)
+  val clock = IO(Input(Clock()))
+  val reset = IO(Input(Bool()))
+}
+
+// this converts from the top-level IO that the rest of midas expects to the
+// single-io-less new rocketchip
+class TargetBoxBundleWrap(targetIo: Data) extends Module {
+  val origtop = targetIo.cloneType.asInstanceOf[Bundle]
   val io = IO(new Bundle {
     val clock = Input(Clock())
     val reset = Input(Bool())
-    val io = targetIo.cloneType
+    val fire = Input(Bool())
+
+    val io = new Bundle {
+      val mem_axi4 = origtop.elements("mem_axi4").cloneType
+      val serial = origtop.elements("serial").cloneType
+    }
   })
+  val target = Module(new TargetBox(targetIo))
+  target.clock := io.clock
+  target.reset := io.reset
+  io.io.mem_axi4 <> target.mem_axi4
+  io.io.serial <> target.serial
 }
 
 class SimBox(simIo: SimWrapperIO)
@@ -182,10 +212,10 @@ class SimBox(simIo: SimWrapperIO)
 
 class SimWrapper(targetIo: Data)
                 (implicit val p: Parameters) extends Module with HasSimWrapperParams {
-  val target = Module(new TargetBox(targetIo))
+  val target = Module(new TargetBoxBundleWrap(targetIo))
   val io = IO(new SimWrapperIO(target.io.io, target.io.reset))
   val fire = Wire(Bool())
-
+  target.io.fire := fire
   target.io.clock := clock
 
   /*** Wire Channels ***/
