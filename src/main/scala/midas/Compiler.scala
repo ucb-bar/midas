@@ -61,6 +61,7 @@ object MidasCompiler {
         val reset = target.getPorts(1).id.cloneType
         val mem_axi4 = target.getPorts(2).id.cloneType
         val serial = target.getPorts(3).id.cloneType
+        val uarts = target.getPorts(4).id.cloneType
 
         override def cloneType = new RCBundle().asInstanceOf[this.type]
     }
