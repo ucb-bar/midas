@@ -177,6 +177,7 @@ class TargetBox(targetIo: Data) extends ExtModule {
   val serial = IO(origtop.elements("serial").cloneType)
   val uarts = IO(origtop.elements("uarts").cloneType)
   val net = IO(origtop.elements("net").cloneType)
+  val bdev = IO(origtop.elements("bdev").cloneType)
   val clock = IO(Input(Clock()))
   val reset = IO(Input(Bool()))
 }
@@ -195,6 +196,7 @@ class TargetBoxBundleWrap(targetIo: Data) extends Module {
       val serial = origtop.elements("serial").cloneType
       val uarts = origtop.elements("uarts").cloneType
       val net = origtop.elements("net").cloneType
+      val bdev = origtop.elements("bdev").cloneType
     }
   })
   val target = Module(new TargetBox(targetIo))
@@ -204,6 +206,7 @@ class TargetBoxBundleWrap(targetIo: Data) extends Module {
   io.io.serial <> target.serial
   io.io.uarts <> target.uarts
   io.io.net <> target.net
+  io.io.bdev <> target.bdev
 }
 
 class SimBox(simIo: SimWrapperIO)
