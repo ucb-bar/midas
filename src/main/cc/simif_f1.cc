@@ -6,7 +6,19 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-simif_f1_t::simif_f1_t() {
+simif_f1_t::simif_f1_t(int argc, char** argv) {
+    slot_id = -1;
+    std::vector<std::string> args(argv + 1, argv + argc);
+    for (auto &arg: args) {
+        if (arg.find("+slotid=") == 0) {
+            slot_id = atoi((arg.c_str()) + 8);
+        }
+    }
+    if (slot_id == -1) {
+        fprintf(stderr, "Slot ID not specified. Assuming Slot 0\n");
+        slot_id = 0;
+    }
+
 #ifdef SIMULATION_XSIM
     mkfifo(driver_to_xsim, 0666);
     fprintf(stderr, "opening driver to xsim\n");
@@ -51,7 +63,6 @@ void simif_f1_t::fpga_setup() {
     uint16_t pci_vendor_id = 0x1D0F; /* Amazon PCI Vendor ID */
     uint16_t pci_device_id = 0xF000; /* PCI Device ID preassigned by Amazon for F1 applications */
 
-    slot_id = 0; // TODO: make this a cmd line arg
     int rc = fpga_pci_init();
     check_rc(rc, "fpga_pci_init FAILED");
 
