@@ -85,8 +85,10 @@ class DumpChains(
         addPad(chainFile, cw, dw)(chainType)
       case _ =>
     }
-    meta.childInsts(mod) foreach (child => loop(
-      chainFile, meta.instModMap(child, mod), s"${path}.${child}")(chainType))
+    meta.childInsts(mod) filter (x =>
+       !(mod == "RocketTile" && x == "fpuOpt") &&
+       !(mod == "NonBlockingDCache_dcache" && x == "dtlb")
+    ) foreach (child => loop(chainFile, meta.instModMap(child, mod), s"${path}.${child}")(chainType))
   }
 
   def run(c: Circuit) = {
