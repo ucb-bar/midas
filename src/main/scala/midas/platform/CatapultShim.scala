@@ -1,11 +1,11 @@
 package midas
 package platform
 
-import util.ParameterizedBundle // from rocketchip
+import freechips.rocketchip.util.ParameterizedBundle // from rocketchip
 import widgets._
 import chisel3._
 import chisel3.util._
-import config.{Parameters, Field}
+import freechips.rocketchip.config.{Parameters, Field}
 import junctions._
 
 case object PCIeWidth extends Field[Int]

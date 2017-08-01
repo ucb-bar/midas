@@ -1,5 +1,6 @@
 package midas
 
+import freechips.rocketchip.config.Parameters
 import chisel3.{Data, Bundle}
 import firrtl.ir.Circuit
 import firrtl.CompilerUtils.getLoweringTransforms
@@ -13,7 +14,7 @@ class InlineCompiler extends firrtl.Compiler {
 }
 
 // Compiler for Midas Transforms
-private class MidasCompiler(dir: File, io: Data)(implicit param: config.Parameters) extends firrtl.Compiler {
+private class MidasCompiler(dir: File, io: Data)(implicit param: Parameters) extends firrtl.Compiler {
   def emitter = new firrtl.MiddleFirrtlEmitter
   def transforms = getLoweringTransforms(firrtl.ChirrtlForm, firrtl.MidForm) ++ Seq(
     new InferReadWrite,
@@ -30,7 +31,7 @@ private class VerilogCompiler(confFile: File, macroFile: File) extends firrtl.Co
 }
 
 object MidasCompiler {
-  def apply(chirrtl: Circuit, io: Data, dir: File)(implicit p: config.Parameters): Circuit = {
+  def apply(chirrtl: Circuit, io: Data, dir: File)(implicit p: Parameters): Circuit = {
     val confFile = new File(dir, s"${chirrtl.main}.conf")
     val macroFile = new File(dir, s"${chirrtl.main}.macros.v")
     val annotations = new firrtl.AnnotationMap(Seq(
@@ -51,7 +52,7 @@ object MidasCompiler {
     result.circuit
   }
 
-  def apply[T <: chisel3.experimental.RawModule](w: => T, dir: File)(implicit p: config.Parameters): Circuit = {
+  def apply[T <: chisel3.experimental.RawModule](w: => T, dir: File)(implicit p: Parameters): Circuit = {
     dir.mkdirs
     lazy val target = w
     val chirrtl = firrtl.Parser.parse(chisel3.Driver.emit(() => target))

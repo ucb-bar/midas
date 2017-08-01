@@ -1,12 +1,12 @@
 package midas
 package platform
 
-import util.ParameterizedBundle // from rocketchip
+import freechips.rocketchip.util.ParameterizedBundle // from rocketchip
 
 import chisel3._
 import chisel3.util._
 import junctions._
-import config.{Parameters, Field}
+import freechips.rocketchip.config.{Parameters, Field}
 
 abstract class PlatformShim extends Module {
   def top: midas.core.FPGATop

@@ -5,13 +5,13 @@ import junctions._
 import widgets._
 import chisel3._
 import chisel3.util._
-import config.{Parameters, Field}
+import freechips.rocketchip.config.{Parameters, Field}
 import scala.collection.mutable.ArrayBuffer
 
 case object MemNastiKey extends Field[NastiParameters]
 case object FpgaMMIOSize extends Field[BigInt]
 
-class FPGATopIO(implicit p: Parameters) extends _root_.util.ParameterizedBundle()(p) {
+class FPGATopIO(implicit p: Parameters) extends freechips.rocketchip.util.ParameterizedBundle()(p) {
   val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
   val mem  = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
 }

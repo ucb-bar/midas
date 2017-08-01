@@ -15,7 +15,7 @@ import java.io.StringWriter
 class AddDaisyChains(
     meta: StroberMetaData,
     seqMems: Map[String, midas.passes.MemConf])
-   (implicit param: config.Parameters) extends firrtl.passes.Pass {
+   (implicit param: freechips.rocketchip.config.Parameters) extends firrtl.passes.Pass {
   override def name = "[strober] Add Daisy Chains"
 
   implicit def expToString(e: Expression): String = e.serialize

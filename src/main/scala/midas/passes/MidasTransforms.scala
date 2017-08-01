@@ -27,7 +27,7 @@ object MidasAnnotation {
 private[midas] class MidasTransforms(
     dir: java.io.File,
     io: chisel3.Data)
-   (implicit param: config.Parameters) extends Transform {
+   (implicit param: freechips.rocketchip.config.Parameters) extends Transform {
   def inputForm = MidForm
   def outputForm = MidForm
   def execute(state: CircuitState) = (getMyAnnotations(state): @unchecked) match {

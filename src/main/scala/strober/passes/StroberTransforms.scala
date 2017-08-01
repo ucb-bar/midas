@@ -90,7 +90,7 @@ private object postorder {
 class StroberTransforms(
     dir: java.io.File,
     seqMems: Map[String, midas.passes.MemConf])
-   (implicit param: config.Parameters) extends Transform {
+   (implicit param: freechips.rocketchip.config.Parameters) extends Transform {
   def inputForm = MidForm
   def outputForm = MidForm
   def execute(state: CircuitState) = {
