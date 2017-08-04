@@ -63,7 +63,7 @@ object MidasCompiler {
         val debug = target.getPorts(2).id.cloneType
         val mem_axi4 = target.getPorts(3).id.cloneType
         val serial = target.getPorts(4).id.cloneType
-        val uarts = target.getPorts(5).id.cloneType
+        val uart = target.getPorts(5).id.cloneType
         val net = target.getPorts(6).id.cloneType
         val bdev = target.getPorts(7).id.cloneType
 
