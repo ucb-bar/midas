@@ -9,6 +9,7 @@ import firrtl.passes.VerilogRename.verilogRenameN
 import strober.core.ChainType
 import mdf.macrolib.SRAMMacro
 import java.io.{File, FileWriter}
+import AddDaisyChains._
 
 class DumpChains(
     dir: File,
@@ -61,7 +62,7 @@ class DumpChains(
                     chainFile write s"$id ${path}.${s.name}_${rw}_rdata ${width} -1\n")
                   (s.readers.size + s.readwriters.size) * width.toInt
               }
-            case s: DefMemory =>
+            case s: DefMemory if !(debugRegs exists (s.name contains _))=>
               val name = verilogRenameN(s.name)
               val width = bitWidth(s.dataType).toInt
               chainType match {
@@ -73,7 +74,7 @@ class DumpChains(
                   sum + width
                 })
               }
-            case s: DefRegister =>
+            case s: DefRegister if !deadRegs(s.name) && !(debugRegs exists (s.name contains _))=>
               val name = verilogRenameN(s.name)
               val width = bitWidth(s.tpe).toInt
               chainFile write s"$id $path.$name $width -1\n"
