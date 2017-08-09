@@ -60,7 +60,7 @@ object MidasCompiler {
     class RCBundle extends Bundle {
         val clock = target.getPorts(0).id.cloneType
         val reset = target.getPorts(1).id.cloneType
-        val debug = target.getPorts(2).id.cloneType
+        // Skip Debug port
         val mem_axi4 = target.getPorts(3).id.cloneType
         val serial = target.getPorts(4).id.cloneType
         val uart = target.getPorts(5).id.cloneType
