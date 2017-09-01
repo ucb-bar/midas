@@ -10,7 +10,7 @@ import mdf.macrolib.SRAMMacro
 import mdf.macrolib.Utils.readMDFFromString
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet, LinkedHashSet}
 
-private object StroberMetaData {
+object StroberMetaData {
   private def collectChildren(
       mname: String,
       meta: StroberMetaData,
@@ -43,7 +43,7 @@ private object StroberMetaData {
   }
 }
 
-private class StroberMetaData {
+class StroberMetaData {
   type ChainMap = HashMap[String, ArrayBuffer[ir.Statement]]
   type ChildMods = HashMap[String, LinkedHashSet[String]]
   type ChildInsts = HashMap[String, ArrayBuffer[String]]
@@ -55,7 +55,7 @@ private class StroberMetaData {
   val chains = (ChainType.values.toList map (_ -> new ChainMap)).toMap
 }
 
-private object preorder {
+object preorder {
   def aplly(c: Circuit,
             meta: StroberMetaData)
            (visit: DefModule => DefModule): Seq[DefModule] = {
@@ -70,7 +70,7 @@ private object preorder {
   }
 }
 
-private object postorder {
+object postorder {
   def apply(c: Circuit,
             meta: StroberMetaData)
            (visit: DefModule => DefModule): Seq[DefModule] = {

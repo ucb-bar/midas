@@ -7,7 +7,7 @@ import firrtl.ir._
 import firrtl.Mappers._
 import firrtl.annotations._
 import Utils._
-import java.io.{File, FileWriter}
+import java.io.{File, FileWriter, Writer}
 
 private class WCircuit(
   info: Info,
@@ -46,6 +46,7 @@ private[midas] class MidasTransforms(
         new barstools.macros.MacroCompilerTransform,
         firrtl.passes.ResolveKinds,
         firrtl.passes.RemoveEmpty,
+        new AssertPass(dir),
         new Fame1Transform(lib getOrElse json),
         new strober.passes.StroberTransforms(dir, lib getOrElse json),
         new SimulationMapping(io),
