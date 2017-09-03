@@ -1,4 +1,5 @@
 #include "simif.h"
+#include <iostream>
 #include <fstream>
 #include <algorithm>
 
@@ -22,7 +23,7 @@ simif_t::simif_t() {
 void simif_t::init(int argc, char** argv, bool log) {
   // Simulation reset
   write(MASTER(SIM_RESET), 1);
-  while(!done());
+  while(!read(MASTER(DONE)));
 
   this->log = log;
   std::vector<std::string> args(argv + 1, argv + argc);
@@ -135,6 +136,31 @@ void simif_t::step(int n, bool blocking) {
   take_steps(n, blocking);
   t += n;
 }
+
+#ifdef ENABLE_DEBUG
+void simif_t::detect_assert() {
+  if (read(ASSERTWIDGET(fire))) {
+    // Read assertion information
+    std::vector<std::string> msgs;
+    std::ifstream file(std::string(TARGET_NAME) + ".asserts");
+    std::string line;
+    std::ostringstream oss;
+    while (std::getline(file, line)) {
+      if (line == "0") {
+        msgs.push_back(oss.str());
+        oss.str(std::string());
+      } else {
+        oss << line << std::endl;
+      }
+    }
+    uint64_t assert_cycle = read(ASSERTWIDGET(cycle_low));
+    assert_cycle |= ((uint64_t)read(ASSERTWIDGET(cycle_high))) << 32;
+    std::cerr << msgs[read(ASSERTWIDGET(id))];
+    std::cerr << " at cycle: " << assert_cycle << std::endl;
+    exit(EXIT_FAILURE);
+  }
+}
+#endif // ENABLE_DEBUG
 
 #ifdef LOADMEM
 void simif_t::load_mem(std::string filename) {

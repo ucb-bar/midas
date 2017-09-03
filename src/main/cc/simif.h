@@ -44,13 +44,21 @@ class simif_t
 #ifdef LOADMEM
     virtual void load_mem(std::string filename);
 #endif
+#ifdef ENABLE_DEBUG
+    void detect_assert();
+#endif
 
   public:
     // Simulation APIs
     virtual void init(int argc, char** argv, bool log = false);
     virtual int finish();
     virtual void step(int n, bool blocking = true);
-    inline bool done() { return read(MASTER(DONE)); }
+    inline bool done() {
+#ifdef ENABLE_DEBUG
+      detect_assert();
+#endif
+      return read(MASTER(DONE));
+    }
 
     // Widget communication
     virtual void write(size_t addr, data_t data) = 0;
