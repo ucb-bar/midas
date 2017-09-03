@@ -15,6 +15,9 @@ abstract class PlatformShim(implicit p: Parameters) extends Module {
     import widgets.CppGenerationUtils._
     sb.append(genStatic("TARGET_NAME", widgets.CStrLit(target)))
     sb.append(genMacro("PLATFORM_TYPE", s"V${this.getClass.getSimpleName}"))
+    if (p(EnableDebug)) {
+      sb append(genMacro("ENABLE_DEBUG"))
+    }
     if (p(EnableSnapshot)) {
       sb append(genMacro("ENABLE_SNAPSHOT"))
       if (p(KeepSamplesInMem)) sb append(genMacro("KEEP_SAMPLES_IN_MEM"))

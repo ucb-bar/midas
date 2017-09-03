@@ -123,8 +123,23 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     arb.io.master(memIoSize) <> loadMem.io.toSlaveMem
   }
 
+  def createResetQueue(tReset: DecoupledIO[Bool]) = {
+    // each widget should have its own reset queue
+    val resetQueue = Module(new Queue(Bool(), 4))
+    resetQueue.reset := reset || simReset
+    tReset <> resetQueue.io.deq
+    resetQueue.io.enq.bits := defaultIOWidget.io.tReset.bits
+    resetQueue.io.enq.valid := defaultIOWidget.io.tReset.valid
+    resetQueue.io.enq.ready
+  }
+
   // Instantiate endpoint widgets
-  defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
+  defaultIOWidget.io.tReset.ready := (if (p(EnableDebug)) {
+    val assertWidget = addWidget(new AssertWidget, "AssertWidget")
+    assertWidget.reset := reset || simReset
+    assertWidget.io.assert <> simIo.assert
+    createResetQueue(assertWidget.io.tReset)
+  } else true.B) && (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {
         case (_: SimMemIO, Some(_)) => s"MemModel_$i"
@@ -138,13 +153,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
         case _ =>
       }
       channels2Port(widget.io.hPort, endpoint(i)._2)
-      // each widget should have its own reset queue
-      val resetQueue = Module(new Queue(Bool(), 4))
-      resetQueue.reset := reset || simReset
-      widget.io.tReset <> resetQueue.io.deq
-      resetQueue.io.enq.bits := defaultIOWidget.io.tReset.bits
-      resetQueue.io.enq.valid := defaultIOWidget.io.tReset.valid
-      ready && resetQueue.io.enq.ready
+      ready && createResetQueue(widget.io.tReset)
     }
   }
 
