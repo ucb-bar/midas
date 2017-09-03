@@ -114,3 +114,11 @@ class ReadyValidChannel[T <: Data](gen: T, flipped: Boolean, n: Int = 2)(implici
     io.trace.ready.valid := Bool(false)
   }
 }
+
+// TODO: just use WireChannel
+class AssertChannel(w: Int)(implicit p: Parameters) extends Module {
+  val io = IO(new WireChannelIO(w))
+  val tokens = Module(new Queue(UInt(w.W), p(ChannelLen)))
+  tokens.io.enq <> io.in
+  io.out <> tokens.io.deq
+}

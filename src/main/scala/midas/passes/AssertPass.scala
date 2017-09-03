@@ -8,21 +8,23 @@ import Utils._
 import strober.passes.{StroberMetaData, postorder}
 import java.io.{File, FileWriter, Writer}
 
-class AssertPass(dir: File) extends firrtl.passes.Pass {
+private[passes] class AssertPass(
+     dir: File)
+    (implicit param: config.Parameters) extends firrtl.passes.Pass {
   override def name = "[midas] Assert Pass"
   type Asserts = collection.mutable.HashMap[String, (Int, String)]
   type Messages = collection.mutable.HashMap[Int, String]
   type AssertModSet = collection.mutable.HashSet[String]
 
-  val asserts = collection.mutable.HashMap[String, Asserts]()
-  val messages = collection.mutable.HashMap[String, Messages]()
-  val ports = collection.mutable.HashMap[String, Port]()
+  private val asserts = collection.mutable.HashMap[String, Asserts]()
+  private val messages = collection.mutable.HashMap[String, Messages]()
+  private val ports = collection.mutable.HashMap[String, Port]()
 
   private def synAsserts(mname: String,
                          namespace: Namespace)
                         (s: Statement): Statement =
     s map synAsserts(mname, namespace) match {
-      case s: Stop if s.ret != 0 =>
+      case s: Stop if param(EnableDebug) && s.ret != 0 =>
         val idx = asserts.size
         val name = namespace newName s"assert_$idx"
         asserts(mname)(s.en.serialize) = idx -> name
@@ -33,14 +35,14 @@ class AssertPass(dir: File) extends firrtl.passes.Pass {
   private def findMessages(mname: String)
                           (s: Statement): Statement =
     s map findMessages(mname) match {
-      case s: Print => asserts(mname) get s.en.serialize match {
-        case Some((idx, str)) =>
-          assert(s.args.isEmpty)
-          println(s"$idx, $str => ${s.string.serialize}")
-          messages(mname)(idx) = s.string.serialize
-          EmptyStmt
-        case None => s
-      }
+      case s: Print if param(EnableDebug) =>
+        asserts(mname) get s.en.serialize match {
+          case Some((idx, str)) =>
+            assert(s.args.isEmpty)
+            messages(mname)(idx) = s.string.serialize
+            EmptyStmt
+          case None => s
+        }
       case s => s
     }
 
@@ -90,8 +92,6 @@ class AssertPass(dir: File) extends firrtl.passes.Pass {
     val f = new FileWriter(new File(dir, s"${c.main}.asserts"))
     dump(f, meta, c.main, c.main)
     f.close
-val cc = c copy (modules = mods)
-println(cc.serialize)
-cc
-}
+    new DCircuit(c.info, mods, c.main, (asserts foldLeft 0)(_ + _._2.size))
+  }
 }

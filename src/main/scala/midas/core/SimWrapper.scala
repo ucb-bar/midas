@@ -12,6 +12,8 @@ import SimUtils._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.{ArrayBuffer, HashSet}
 
+case object NumAsserts extends Field[Int]
+
 object SimUtils {
   def parsePorts(io: Data, reset: Option[Bool] = None, prefix: String = "io") = {
     val inputs = ArrayBuffer[(Bits, String)]()
@@ -55,7 +57,10 @@ trait HasSimWrapperParams {
   val traceMaxLen = p(strober.core.TraceMaxLen)
   val daisyWidth = p(strober.core.DaisyWidth)
   val sramChainNum = p(strober.core.SRAMChainNum)
+  val enableDebug = p(EnableDebug)
   val enableSnapshot = p(EnableSnapshot)
+  val numAsserts = p(NumAsserts)
+  val assertIdWidth = if (numAsserts > 0) log2Ceil(numAsserts) else 0
 }
 
 class SimReadyValidRecord(es: Seq[(String, ReadyValidIO[Data])]) extends Record {
@@ -149,6 +154,9 @@ class SimWrapperIO(
   val readyValidInMap = (readyValidInputs.unzip._2 zip readyValidIns.elements).toMap
   val readyValidOutMap = (readyValidOutputs.unzip._2 zip readyValidOuts.elements).toMap
   val readyValidMap = readyValidInMap ++ readyValidOutMap
+
+  /*** Debug Channel ***/
+  val assert = Decoupled(UInt((assertIdWidth + 1).W))
 
   /*** Instrumentation ***/
   val daisy = new strober.core.DaisyBundle(daisyWidth, sramChainNum)
@@ -258,14 +266,27 @@ class SimWrapper(targetIo: Data)
       channel
     }
 
+  // Debug Channels
+  val asserts = Wire(UInt((numAsserts).W))
+  val assertChannel = Wire(Decoupled(UInt((assertIdWidth + 1).W)))
+  if (numAsserts > 0) {
+    val channel = Module(new AssertChannel(assertIdWidth))
+    io.assert <> channel.io.out
+    channel.io.in <> assertChannel
+    assertChannel.bits := Cat(PriorityEncoder(asserts), asserts.orR)
+  } else {
+    assertChannel.ready := true.B
+  }
+
   // Control
   // Firing condtion:
   // 1) all input values are valid
   // 2) all output FIFOs are not full
-  fire := (wireInChannels foldLeft true.B)(_ && _.io.out.valid) && 
+  fire := (wireInChannels foldLeft true.B)(_ && _.io.out.valid) &&
           (wireOutChannels foldLeft true.B)(_ && _.io.in.ready) &&
           (readyValidInChannels foldLeft true.B)(_ && _.io.deq.host.hValid) &&
-          (readyValidOutChannels foldLeft true.B)(_ && _.io.enq.host.hReady)
+          (readyValidOutChannels foldLeft true.B)(_ && _.io.enq.host.hReady) &&
+          assertChannel.ready
  
   // Inputs are consumed when firing conditions are met
   wireInChannels foreach (_.io.out.ready := fire)
@@ -275,6 +296,7 @@ class SimWrapper(targetIo: Data)
   val resetNext = RegNext(reset)
   wireOutChannels foreach (_.io.in.valid := fire || resetNext)
   readyValidOutChannels foreach (_.io.enq.host.hValid := fire || resetNext)
+  assertChannel.valid := fire || resetNext
 
   // Trace size is runtime configurable
   wireInChannels foreach (_.io.traceLen := io.traceLen)

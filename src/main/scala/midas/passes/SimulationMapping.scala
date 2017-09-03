@@ -30,6 +30,8 @@ private[passes] class SimulationMapping(
       val stmts = Seq(
         Connect(NoInfo, wsub(wref("target"), "targetFire"), wref("fire", BoolType)),
         Connect(NoInfo, wsub(wref("target"), "daisyReset"), wref("reset", BoolType))) ++
+      (if (!param(EnableDebug)) Nil
+       else Seq(Connect(NoInfo, wref("asserts"), wsub(wref("target"), "midasAsserts")))) ++
       (if (!param(EnableSnapshot)) Nil
        else {
          val ports = (m.ports map (p => p.name -> p)).toMap
@@ -47,7 +49,10 @@ private[passes] class SimulationMapping(
   }
 
   def run(c: Circuit) = {
-    lazy val sim = new SimWrapper(io)
+    lazy val sim = new SimWrapper(io)(
+      param alterPartial { case core.NumAsserts =>
+        c match { case d: DCircuit => d.nAsserts }
+      })
     val chirrtl = Parser parse (chisel3.Driver emit (() => sim))
     val annotations = new AnnotationMap(Nil)
     val writer = new StringWriter

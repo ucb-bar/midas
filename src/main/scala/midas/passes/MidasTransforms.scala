@@ -9,6 +9,17 @@ import firrtl.annotations._
 import Utils._
 import java.io.{File, FileWriter, Writer}
 
+private class DCircuit(
+  info: Info,
+  modules: Seq[DefModule],
+  main: String,
+  val nAsserts: Int) extends Circuit(info, modules, main) {
+  override def copy(
+    info: Info = info,
+    modules: Seq[DefModule] = modules,
+    main: String = main) = new DCircuit(info, modules, main, nAsserts)
+}
+
 private class WCircuit(
   info: Info,
   modules: Seq[DefModule],
