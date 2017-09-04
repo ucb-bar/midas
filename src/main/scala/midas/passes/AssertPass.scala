@@ -4,6 +4,8 @@ package passes
 import firrtl._
 import firrtl.ir._
 import firrtl.Mappers._
+import firrtl.WrappedExpression._
+import firrtl.Utils.zero
 import Utils._
 import strober.passes.{StroberMetaData, postorder}
 import java.io.{File, FileWriter, Writer}
@@ -24,8 +26,8 @@ private[passes] class AssertPass(
                          namespace: Namespace)
                         (s: Statement): Statement =
     s map synAsserts(mname, namespace) match {
-      case s: Stop if param(EnableDebug) && s.ret != 0 =>
-        val idx = asserts.size
+      case s: Stop if param(EnableDebug) && s.ret != 0 && !weq(s.en, zero) =>
+        val idx = asserts(mname).size
         val name = namespace newName s"assert_$idx"
         asserts(mname)(s.en.serialize) = idx -> name
         DefNode(s.info, name, s.en)
@@ -75,11 +77,13 @@ private[passes] class AssertPass(
     }
   }
 
+  private var assertNum = 0
   def dump(writer: Writer, meta: StroberMetaData, mod: String, path: String) {
     asserts(mod).values.toSeq sortWith (_._1 < _._1) foreach { case (idx, _) =>
-      writer write s"[module: $mod, path: $path]\n"
+      writer write s"[id: $assertNum, module: $mod, path: $path]\n"
       writer write (messages(mod)(idx) replace ("""\n""", "\n"))
       writer write "0\n"
+      assertNum += 1
     }
     meta.childInsts(mod) foreach { child =>
       dump(writer, meta, meta.instModMap(child, mod), s"${path}.${child}")
@@ -92,6 +96,7 @@ private[passes] class AssertPass(
     val f = new FileWriter(new File(dir, s"${c.main}.asserts"))
     dump(f, meta, c.main, c.main)
     f.close
-    new DCircuit(c.info, mods, c.main, (asserts foldLeft 0)(_ + _._2.size))
+    println(s"[midas] total # of assertions: $assertNum")
+    new DCircuit(c.info, mods, c.main, assertNum)
   }
 }

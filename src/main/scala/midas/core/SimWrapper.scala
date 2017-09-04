@@ -270,7 +270,7 @@ class SimWrapper(targetIo: Data)
   val asserts = Wire(UInt((numAsserts).W))
   val assertChannel = Wire(Decoupled(UInt((assertIdWidth + 1).W)))
   if (numAsserts > 0) {
-    val channel = Module(new AssertChannel(assertIdWidth))
+    val channel = Module(new AssertChannel(assertIdWidth + 1))
     io.assert <> channel.io.out
     channel.io.in <> assertChannel
     assertChannel.bits := Cat(PriorityEncoder(asserts), asserts.orR)
