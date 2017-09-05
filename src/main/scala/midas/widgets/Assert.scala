@@ -13,9 +13,10 @@ class AssertWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
 
 class AssertWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
   val io = IO(new AssertWidgetIO)
+  val resume = Wire(init=false.B)
   val assertId = io.assert.bits >> 1
   val assertFire = io.assert.bits(0) && !io.tReset.bits
-  val fire = io.assert.valid && io.tReset.valid && !assertFire
+  val fire = io.assert.valid && io.tReset.valid && (!assertFire || resume)
   val cycles = Reg(UInt(64.W))
   io.assert.ready := fire
   io.tReset.ready := fire
@@ -28,5 +29,6 @@ class AssertWidget(implicit p: Parameters) extends Widget()(p) with HasChannels 
   // FIXME: no hardcode
   genROReg(cycles(31, 0), "cycle_low")
   genROReg(cycles >> 32, "cycle_high")
+  Pulsify(genWORegInit(resume, "resume", Bool(false)), pulseLength = 1)
   genCRFile()
 }
