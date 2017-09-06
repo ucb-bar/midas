@@ -15,7 +15,7 @@ abstract class PlatformShim(implicit p: Parameters) extends Module {
     import widgets.CppGenerationUtils._
     sb.append(genStatic("TARGET_NAME", widgets.CStrLit(target)))
     sb.append(genMacro("PLATFORM_TYPE", s"V${this.getClass.getSimpleName}"))
-    if (p(EnableDebug)) {
+    if (p(EnableDebug) && p(midas.core.NumAsserts) > 0) {
       sb append(genMacro("ENABLE_DEBUG"))
     }
     if (p(EnableSnapshot)) {

@@ -8,7 +8,7 @@ import config.Parameters
 
 class AssertWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
   val tReset = Flipped(Decoupled(Bool()))
-  val assert = Flipped(Decoupled(UInt((log2Ceil(p(NumAsserts)) + 1).W)))
+  val assert = Flipped(Decoupled(UInt((log2Ceil(p(NumAsserts) max 1) + 1).W)))
 }
 
 class AssertWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
@@ -29,6 +29,6 @@ class AssertWidget(implicit p: Parameters) extends Widget()(p) with HasChannels 
   // FIXME: no hardcode
   genROReg(cycles(31, 0), "cycle_low")
   genROReg(cycles >> 32, "cycle_high")
-  Pulsify(genWORegInit(resume, "resume", Bool(false)), pulseLength = 1)
+  Pulsify(genWORegInit(resume, "resume", false.B), pulseLength = 1)
   genCRFile()
 }

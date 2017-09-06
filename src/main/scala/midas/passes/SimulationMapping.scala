@@ -24,13 +24,13 @@ private[passes] class SimulationMapping(
       case s => s map initStmt(target)
     }
 
-  private def init(info: Info, target: String, main: String, tpe: Type)(m: DefModule) = m match {
+  private def init(info: Info, target: String, main: String, tpe: Type, nAsserts: Int)(m: DefModule) = m match {
     case m: Module if m.name == main =>
       val body = initStmt(target)(m.body)
       val stmts = Seq(
         Connect(NoInfo, wsub(wref("target"), "targetFire"), wref("fire", BoolType)),
         Connect(NoInfo, wsub(wref("target"), "daisyReset"), wref("reset", BoolType))) ++
-      (if (!param(EnableDebug)) Nil
+      (if (!param(EnableDebug) || nAsserts == 0) Nil
        else Seq(Connect(NoInfo, wref("asserts"), wsub(wref("target"), "midasAsserts")))) ++
       (if (!param(EnableSnapshot)) Nil
        else {
@@ -61,7 +61,7 @@ private[passes] class SimulationMapping(
     val circuit = renameMods((new LowFirrtlCompiler compile (
       CircuitState(chirrtl, ChirrtlForm), writer)).circuit, Namespace(c))
     val modules = c.modules ++ (circuit.modules flatMap
-      init(c.info, c.main, circuit.main, targetType))
+      init(c.info, c.main, circuit.main, targetType, sim.numAsserts))
     // writer.close
     new WCircuit(circuit.info, modules, circuit.main, sim.io)
   }

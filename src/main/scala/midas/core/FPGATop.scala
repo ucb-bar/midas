@@ -134,7 +134,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
   }
 
   // Instantiate endpoint widgets
-  defaultIOWidget.io.tReset.ready := (if (p(EnableDebug)) {
+  defaultIOWidget.io.tReset.ready := (if (p(EnableDebug) && p(NumAsserts) > 0) {
     val assertWidget = addWidget(new AssertWidget, "AssertWidget")
     assertWidget.reset := reset || simReset
     assertWidget.io.assert <> simIo.assert

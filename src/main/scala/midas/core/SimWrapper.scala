@@ -60,7 +60,7 @@ trait HasSimWrapperParams {
   val enableDebug = p(EnableDebug)
   val enableSnapshot = p(EnableSnapshot)
   val numAsserts = p(NumAsserts)
-  val assertIdWidth = if (numAsserts > 0) log2Ceil(numAsserts) else 0
+  val assertIdWidth = log2Ceil(numAsserts max 1)
 }
 
 class SimReadyValidRecord(es: Seq[(String, ReadyValidIO[Data])]) extends Record {
