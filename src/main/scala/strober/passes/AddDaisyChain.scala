@@ -51,7 +51,7 @@ class AddDaisyChains(
 
   type DefModules = collection.mutable.ArrayBuffer[DefModule]
   type Statements = collection.mutable.ArrayBuffer[Statement]
-  type Readers = collection.mutable.HashMap[String, Seq[String]]
+  type Readers = collection.mutable.HashMap[String, (Seq[String], Seq[String], Expression)]
   type Netlist = collection.mutable.HashMap[String, Expression]
   type ChainModSet = collection.mutable.HashSet[String]
 
@@ -123,7 +123,7 @@ class AddDaisyChains(
         val sram = srams(s.module)
         sum + sram.width * (sram.ports filter (_.output.nonEmpty)).size
     }
-    def daisyConnects(regs: Seq[Expression], daisyLen: Int, daisyWidth: Int) = {
+    def dataConnects(regs: Seq[Expression], daisyLen: Int, daisyWidth: Int) = {
       (((0 until daisyLen) foldRight (Seq[Connect](), 0, 0)){case (i, (stmts, index, offset)) =>
         def loop(total: Int, index: Int, offset: Int, wires: Seq[Expression]): (Int, Int, Seq[Expression]) = {
           (daisyWidth - total) match {
@@ -145,6 +145,33 @@ class AddDaisyChains(
         (stmts :+ Connect(NoInfo, widx(chainDataIo("data"), i), cat(wires)), idx, off)
       })._1
     }
+    val loadCond = wsub(chainDataIo("load"), "valid")
+    def loadConnects(regs: Seq[Expression], daisyLen: Int, daisyWidth: Int) = {
+      ((regs foldLeft (Seq[Statement](), daisyLen - 1, daisyWidth)){case ((stmts, idx, offset), reg) =>
+        val regWidth = bitWidth(reg.tpe).toInt
+        def loop(total: Int, i: Int, offset: Int, wires: Seq[Expression]): (Int, Int, Seq[Expression]) = {
+          val port = widx(wsub(chainDataIo("load"), "bits"), i)
+          (regWidth - total) match {
+            case 0 => (i, offset, wires)
+            case margin if margin < offset =>
+              loop(total + margin, i, offset - margin, wires :+ bits(port, offset - 1, offset - margin))
+            case margin =>
+              loop(total + offset, i - 1, daisyWidth, wires :+ bits(port, offset - 1, 0))
+          }
+        }
+        val (i, off, wires) = loop(0, idx, offset, Nil)
+        val stmt = kind(reg) match {
+          case ExpKind =>
+            Conditionally(NoInfo, loadCond, Connect(NoInfo, reg, cat(wires)), EmptyStmt)
+          case MemKind => chainType match {
+            case ChainType.Regs => Connect(NoInfo, reg, cat(wires))
+            case ChainType.Trace => EmptyStmt
+          }
+          case InstanceKind => EmptyStmt
+        }
+        (stmts :+ stmt, i, off)
+      })._1
+    }
 
     val chainElems = new Statements
     collect(chainType, chainElems)(m.body)
@@ -163,33 +190,41 @@ class AddDaisyChains(
         Connect(NoInfo, wsub(chainRef(), "reset"), wref("daisyReset")),
         // <daisy_chain>.io.stall <- not(targetFire)
         Connect(NoInfo, wsub(chainIo(), "stall"), not(wref("targetFire"))),
+        // <daisy_chain>.io.load <- daisyPort.load
+        Connect(NoInfo, wsub(chainIo(), "load"), daisyPort("load")),
         // <daiy_port>.out <- <daisy_chain>.io.dataIo.out
         Connect(NoInfo, daisyPort("out"), chainDataIo("out"))
       )
       hasChain += m.name
       val stmts = new Statements
       val regs = meta.chains(chainType)(m.name) flatMap {
-        case s: DefRegister => create_exps(s.name, s.tpe)
+        case s: DefRegister => create_exps(s.name, s.tpe) map (x => (x, x))
         case s: DefMemory => chainType match {
           case ChainType.Regs =>
             val rs = (0 until s.depth) map (i => s"scan_$i")
-            val mem = s.copy(readers = s.readers ++ rs)
-            val exps = rs map (r => create_exps(memPortField(mem, r, "data")))
-            readers(s.name) = rs
-            ((0 until exps.head.size) foldLeft Seq[Expression]())(
+            val ws = (0 until s.depth) map (i => s"load_$i")
+            val mem = s.copy(readers = s.readers ++ rs, writers = s.writers ++ ws)
+            val exps = (rs zip ws) map { case (r, w) =>
+              create_exps(memPortField(mem, r, "data")) zip
+              create_exps(memPortField(mem, w, "data")) }
+            readers(s.name) = (rs, ws, loadCond)
+            ((0 until exps.head.size) foldLeft Seq[(Expression, Expression)]())(
               (res, i) => res ++ (exps map (_(i))))
-          case ChainType.Trace =>
+          case ChainType.Trace => (
             (s.readers flatMap (r =>
               create_exps(memPortField(s, r, "data")).reverse)) ++
             (s.readwriters flatMap (rw =>
               create_exps(memPortField(s, rw, "rdata")).reverse))
+          ) map (x => (x, x))
         }
         case s: WDefInstance =>
           val memref = wref(s.name, s.tpe, InstanceKind)
           val ports = srams(s.module).ports filter (_.output.nonEmpty)
-          ports map (p => wsub(memref, p.output.get.name))
+          ports map (p => wsub(memref, p.output.get.name)) map (x => (x, x))
       }
-      stmts ++ instStmts ++ portConnects ++ daisyConnects(regs, chain.daisyLen, chain.daisyWidth)
+      stmts ++ instStmts ++ portConnects ++
+      dataConnects(regs.unzip._1, chain.daisyLen, chain.daisyWidth) ++
+      loadConnects(regs.unzip._2, chain.daisyLen, chain.daisyWidth)
     }
   }
 
@@ -388,14 +423,19 @@ class AddDaisyChains(
     ))
     case s: DefMemory => readers get s.name match {
       case None => s
-      case Some(rs) =>
-        val mem = s.copy(readers = s.readers ++ rs)
-        Block(mem +: (rs.zipWithIndex flatMap { case (r, i) =>
-          val addr = UIntLiteral(i, IntWidth(chisel3.util.log2Up(s.depth)))
+      case Some((rs, ws, wen)) =>
+        val mem = s.copy(readers = s.readers ++ rs, writers = s.writers ++ ws)
+        stmts ++= ((rs zip ws).zipWithIndex flatMap { case ((r, w), i) =>
+          val addr = UIntLiteral(i, IntWidth(chisel3.util.log2Ceil(s.depth)))
           Seq(Connect(NoInfo, memPortField(mem, r, "clk"), clock.get),
               Connect(NoInfo, memPortField(mem, r, "en"), one),
-              Connect(NoInfo, memPortField(mem, r, "addr"), addr))
-        }))
+              Connect(NoInfo, memPortField(mem, r, "addr"), addr),
+              Connect(NoInfo, memPortField(mem, w, "clk"), clock.get),
+              Connect(NoInfo, memPortField(mem, w, "en"), wen),
+              Connect(NoInfo, memPortField(mem, w, "addr"), addr)) ++
+          (create_exps(memPortField(mem, w, "mask")) map (mask => Connect(NoInfo, mask, one)))
+        })
+        mem
     }
     case s: Connect => kind(s.loc) match {
       // Replace sram inputs

@@ -20,6 +20,7 @@ object ChainType extends Enumeration { val Trace, Regs, SRAM, RegFile, Cntr = Va
 class DaisyData(daisywidth: Int) extends Bundle {
   val in = Flipped(Decoupled(UInt(daisywidth.W)))
   val out = Decoupled(UInt(daisywidth.W))
+  val load = Input(Bool())
   override def cloneType: this.type =
     new DaisyData(daisywidth).asInstanceOf[this.type]
 }
@@ -70,14 +71,16 @@ abstract class DaisyChainBundle(implicit val p: Parameters)
     extends ParameterizedBundle with DaisyChainParams
 
 class DataIO(implicit p: Parameters) extends DaisyChainBundle()(p) {
-  val in = Flipped(Decoupled(Input(UInt(daisyWidth.W))))
-  val out = Decoupled(Input(UInt(daisyWidth.W)))
+  val in   = Flipped(Decoupled(Input(UInt(daisyWidth.W))))
+  val out  = Decoupled(Input(UInt(daisyWidth.W)))
   val data = Vec(daisyLen, Input(UInt(daisyWidth.W)))
+  val load = Valid(Vec(daisyLen, UInt(daisyWidth.W)))
 }
 
 class CntrIO extends Bundle {
   val copyCond = Output(Bool())
   val readCond = Output(Bool())
+  val loadCond = Output(Bool())
   val cntrNotZero = Output(Bool())
   val outFire = Input(Bool())
   val inValid = Input(Bool())
@@ -112,10 +115,13 @@ class RegChainDatapath(implicit p: Parameters) extends DaisyChainModule()(p) {
         regs(i) := regs(i-1)
     }
   }
+  io.dataIo.load.bits <> regs
+  io.dataIo.load.valid := io.ctrlIo.loadCond
 }
 
 class DaisyControlIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
   val stall = Input(Bool())
+  val load  = Input(Bool())
   val ctrlIo = new CntrIO
 }
 
@@ -146,10 +152,12 @@ class RegChainControl(implicit p: Parameters) extends DaisyChainModule()(p) {
   io.ctrlIo.cntrNotZero := counter.isNotZero
   io.ctrlIo.copyCond := io.stall && !copied || RegNext(reset)
   io.ctrlIo.readCond := io.stall && copied && counter.isNotZero
+  io.ctrlIo.loadCond := io.stall && io.load
 }
 
 class RegChainIO(implicit p: Parameters) extends DaisyChainBundle()(p) {
   val stall = Input(Bool())
+  val load  = Input(Bool())
   val dataIo = new DataIO
 }
 
@@ -159,6 +167,7 @@ class RegChain(implicit p: Parameters) extends DaisyChainModule()(p) {
   val control = Module(new RegChainControl)
 
   control.io.stall := io.stall
+  control.io.load  := io.load
   datapath.io.ctrlIo <> control.io.ctrlIo
   io.dataIo <> datapath.io.dataIo
 }

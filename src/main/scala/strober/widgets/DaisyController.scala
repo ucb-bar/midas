@@ -23,13 +23,21 @@ class DaisyController(daisyIF: DaisyBundle)(implicit p: Parameters) extends Widg
   }
 
   def bindDaisyChain[T <: DaisyData](daisy: Vec[T], name: String) = {
-    val inAddrs = (daisy.toSeq map (_.in)).zipWithIndex map {
-      case (channel, idx) => attachDecoupledSink(channel, s"${name}_IN_$idx")
+    val outAddrs = (daisy.toSeq map (_.out)).zipWithIndex map { case (channel, idx) =>
+      attachDecoupledSource(channel, s"${name}_OUT_$idx")
     }
-    val outAddrs = (daisy.toSeq map (_.out)).zipWithIndex map {
-      case (channel, idx) => attachDecoupledSource(channel, s"${name}_OUT_$idx")
+    val inAddrs = (daisy.toSeq map (_.in)).zipWithIndex map { case (channel, idx) =>
+      val wires = Wire(channel)
+      channel <> Queue(wires)
+      attachDecoupledSink(wires, s"${name}_IN_$idx")
     }
-    (inAddrs, outAddrs)
+    val loadAddrs = (daisy.toSeq map (_.load)).zipWithIndex map { case (wire, idx) =>
+      val reg = RegInit(false.B)
+      wire := reg
+      Pulsify(reg, pulseLength = 1)
+      attach(reg, s"${name}_LOAD_$idx", WriteOnly)
+    }
+    (outAddrs, inAddrs, loadAddrs)
   }
   val chains = ChainType.values.toList
   val names = (chains map { t => t -> t.toString.toUpperCase }).toMap
@@ -43,7 +51,9 @@ class DaisyController(daisyIF: DaisyBundle)(implicit p: Parameters) extends Widg
     sb.append(genMacro("REGFILE_RESTART_ADDR", UInt32(base + 1)))
     sb.append(genEnum("CHAIN_TYPE", (chains map (t => s"${names(t)}_CHAIN")) :+ "CHAIN_NUM"))
     sb.append(genArray("CHAIN_SIZE", chains map (t => UInt32(io.daisy(t).size))))
-    sb.append(genArray("CHAIN_ADDR", chains map (t => UInt32(base + addrs(t)._2.head))))
+    sb.append(genArray("CHAIN_ADDR", chains map (t => UInt32(base + addrs(t)._1.head))))
+    sb.append(genArray("CHAIN_IN_ADDR", chains map (t => UInt32(base + addrs(t)._2.head))))
+    sb.append(genArray("CHAIN_LOAD_ADDR", chains map (t => UInt32(base + addrs(t)._3.head))))
   }
 
   genCRFile()
