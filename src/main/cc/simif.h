@@ -6,19 +6,14 @@
 #include <sstream>
 #include <map>
 #include <queue>
-#include "biguint.h"
+#include <random>
 #ifdef ENABLE_SNAPSHOT
 #include "sample/sample.h"
 #endif
-#ifndef _WIN32
+#include <gmp.h>
 #include <sys/time.h>
-#define midas_time_t uint64_t
 #define TIME_DIV_CONST 1000000.0;
-#else
-#include <time.h>
-#define midas_time_t clock_t
-#define TIME_DIV_CONST CLOCKS_PER_SEC
-#endif
+typedef uint64_t midas_time_t;
 
 midas_time_t timestamp();
 
@@ -38,12 +33,17 @@ class simif_t
     bool pass;
     uint64_t t;
     uint64_t fail_t;
-    time_t seed; 
-    virtual void load_mem(std::string filename);
+    // random numbers
+    uint64_t seed;
+    std::mt19937_64 gen;
+
     inline void take_steps(size_t n, bool blocking) {
       write(MASTER(STEP), n);
       if (blocking) while(!done());
     }
+#ifdef LOADMEM
+    virtual void load_mem(std::string filename);
+#endif
 
   public:
     // Simulation APIs
@@ -57,13 +57,15 @@ class simif_t
     virtual data_t read(size_t addr) = 0;
 
     inline void poke(size_t id, data_t value) {
-      if (log) fprintf(stderr, "* POKE %s.%s <- 0x%x *\n", TARGET_NAME, INPUT_NAMES[id], value);
+      if (log) fprintf(stderr, "* POKE %s.%s <- 0x%x *\n",
+        TARGET_NAME, INPUT_NAMES[id], value);
       write(INPUT_ADDRS[id], value);
     }
 
     inline data_t peek(size_t id) {
       data_t value = read(((unsigned int*)OUTPUT_ADDRS)[id]);
-      if (log) fprintf(stderr, "* PEEK %s.%s -> 0x%x *\n", TARGET_NAME, (const char*)OUTPUT_NAMES[id], value);
+      if (log) fprintf(stderr, "* PEEK %s.%s -> 0x%x *\n",
+        TARGET_NAME, (const char*)OUTPUT_NAMES[id], value);
       return value;
     }
 
@@ -82,36 +84,32 @@ class simif_t
       return pass;
     }
 
-    void poke(size_t id, biguint_t& value);
-    void peek(size_t id, biguint_t& value);
-    bool expect(size_t id, biguint_t& expected);
-    void read_mem(size_t addr, biguint_t& value);
-    void write_mem(size_t addr, biguint_t& value);
+    void poke(size_t id, mpz_t& value);
+    void peek(size_t id, mpz_t& value);
+    bool expect(size_t id, mpz_t& expected);
+
+#ifdef LOADMEM
+    void read_mem(size_t addr, mpz_t& value);
+    void write_mem(size_t addr, mpz_t& value);
+#endif
 
     // A default reset scheme that pulses the global chisel reset
     void target_reset(int pulse_start = 1, int pulse_length = 5);
 
     inline uint64_t cycles() { return t; }
-    uint64_t rand_next(uint64_t limit) { return rand() % limit; }
+    uint64_t rand_next(uint64_t limit) { return gen() % limit; }
 
 #ifdef ENABLE_SNAPSHOT
-  public:
-    inline void set_tracelen(size_t len) {
-      assert(len > 2);
-      tracelen = len;
-      write(TRACELEN_ADDR, len);
-    }
-    inline size_t get_tracelen() { return tracelen; }
-
   private:
     // sample information
+#ifdef KEEP_SAMPLES_IN_MEM
     sample_t** samples;
+#endif
     sample_t* last_sample;
     size_t sample_num;
     size_t last_sample_id;
     std::string sample_file;
 
-    size_t tracelen;
     size_t trace_count;
 
     // profile information
@@ -124,14 +122,11 @@ class simif_t
     void finish_sampling();
     void reservoir_sampling(size_t n);
     size_t trace_ready_valid_bits(
-      sample_t* sample,
-      bool poke,
-      size_t bits_id,
-      size_t bits_addr,
-      size_t bits_chunk,
-      size_t num_fields);
+      sample_t* sample, bool poke, size_t id, size_t bits_id);
+    inline void save_sample();
 
   protected:
+    size_t tracelen;
     sample_t* read_snapshot();
     sample_t* read_traces(sample_t* s);
 #endif
