@@ -206,15 +206,18 @@ class SRAMChainControl(implicit override val p: Parameters)
     if (seqRead) addrState === s_ADDRGEN || addrState === s_MEMREAD
     else         addrState === s_MEMREAD
   io.ctrlIo.cntrNotZero := counter.isNotZero
-  io.ctrlIo.copyCond := addrState === s_MEMREAD 
+  io.ctrlIo.copyCond := addrState === s_MEMREAD
   io.ctrlIo.readCond := addrState === s_DONE && counter.isNotZero
+  io.ctrlIo.loadCond := addrState === s_DONE && io.load
   (io.addrIo zip addrIns) foreach { case (addrIo, addrIn) =>
     addrIo.out.valid := addrValid
     if (seqRead) {
-      addrIo.out.bits := Mux(addrState === s_ADDRGEN, addrOut, addrIn)
+      addrIo.out.bits :=
+        Mux(addrState === s_ADDRGEN, addrOut,
+        Mux(io.ctrlIo.loadCond, addrOut - 1.U, addrIn))
       when(addrIo.in.valid) { addrIn := addrIo.in.bits }
     } else {
-      addrIo.out.bits := addrOut
+      addrIo.out.bits := Mux(io.ctrlIo.loadCond, addrOut - 1.U, addrOut)
     }
   }
 
@@ -251,6 +254,7 @@ class SRAMChain(implicit p: Parameters) extends DaisyChainModule()(p) {
 
   control.io.restart := io.restart
   control.io.stall := io.stall
+  control.io.load  := io.load
   datapath.io.ctrlIo <> control.io.ctrlIo
   io.dataIo <> datapath.io.dataIo
   (io.addrIo zip control.io.addrIo) foreach { case (x, y) => x <> y }

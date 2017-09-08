@@ -243,49 +243,103 @@ class AddDaisyChains(
         val sram = srams(s.module)
         (sum + sram.width, max max sram.width, depth max sram.depth)
     }
-    def daisyConnect(stmts: Statements)(elem: (Statement, Int)): Expression = {
-      val (data, addr, ce, re) = (elem._1: @unchecked) match {
+    trait DaisyKind
+    case object DaisyScan extends DaisyKind
+    case object DaisyLoad extends DaisyKind
+    def daisyConnect(stmts: Statements, daisyKind: DaisyKind)(
+                     elem: (Statement, Int)): Seq[Expression] = {
+      val (data, addr, ce, en, mask) = (elem._1: @unchecked) match {
         case s: WDefInstance =>
           val memref = wref(s.name, s.tpe, InstanceKind)
-          val port = (srams(s.module).ports filter (_.output.nonEmpty)).head
-          (wsub(memref, port.output.get.name),
+          val port = daisyKind match {
+            case DaisyScan => (srams(s.module).ports filter (_.output.nonEmpty)).head
+            case DaisyLoad => (srams(s.module).ports filter (_.input.nonEmpty)).head
+          }
+          val enable = daisyKind match {
+            case DaisyScan => port.readEnable
+            case DaisyLoad => port.writeEnable
+          }
+          (wsub(memref, daisyKind match {
+            case DaisyScan => port.output.get.name
+            case DaisyLoad => port.input.get.name
+           }),
            wsub(memref, port.address.name),
            port.chipEnable match {
              case Some(ce) => wsub(memref, ce.name) -> inv(ce.polarity)
              case None => EmptyExpression -> false
            },
-           port.readEnable match {
-             case Some(re) => wsub(memref, re.name) -> inv(re.polarity)
+           enable match {
+             case Some(en) => wsub(memref, en.name) -> inv(en.polarity)
              case None => EmptyExpression -> false
+           },
+           (port.maskPort, daisyKind) match {
+             case (Some(mask), DaisyLoad) =>
+               Seq(wsub(memref, mask.name)) -> inv(mask.polarity)
+             case _ => Nil -> false
            })
-        case s: DefMemory if s.readers.nonEmpty => (
-          memPortField(s, s.readers.head, "data"),
-          memPortField(s, s.readers.head, "addr"),
-          memPortField(s, s.readers.head, "en") -> false,
-          EmptyExpression -> false
-        )
-        case s: DefMemory => (
-          memPortField(s, s.readwriters.head, "rdata"),
-          memPortField(s, s.readwriters.head, "addr"),
-          memPortField(s, s.readwriters.head, "en") -> false,
-          not(memPortField(s, s.readwriters.head, "wmode")) -> false
-        )
+        case s: DefMemory => daisyKind match {
+          case DaisyScan if s.readers.nonEmpty => (
+            memPortField(s, s.readers.head, "data"),
+            memPortField(s, s.readers.head, "addr"),
+            memPortField(s, s.readers.head, "en") -> false,
+            EmptyExpression -> false,
+            Nil -> false
+          )
+          case DaisyScan => (
+            memPortField(s, s.readwriters.head, "rdata"),
+            memPortField(s, s.readwriters.head, "addr"),
+            memPortField(s, s.readwriters.head, "en") -> false,
+            not(memPortField(s, s.readwriters.head, "wmode")) -> false,
+            Nil -> false
+          )
+          case DaisyLoad if s.writers.nonEmpty => (
+            memPortField(s, s.writers.head, "data"),
+            memPortField(s, s.writers.head, "addr"),
+            memPortField(s, s.writers.head, "en") -> false,
+            EmptyExpression -> false,
+            create_exps(memPortField(s, s.writers.head, "mask")) -> false
+          )
+          case DaisyLoad => (
+            memPortField(s, s.readwriters.head, "wdata"),
+            memPortField(s, s.readwriters.head, "addr"),
+            memPortField(s, s.readwriters.head, "en") -> false,
+            memPortField(s, s.readwriters.head, "wmode") -> false,
+            create_exps(memPortField(s, s.readwriters.head, "wmask")) -> false
+          )
+        }
       }
       val addrIn = wsub(widx(wsub(chainIo(), "addrIo"), elem._2), "in")
       val addrOut = wsub(widx(wsub(chainIo(), "addrIo"), elem._2), "out")
+      val addrValid = daisyKind match {
+        case DaisyScan => wsub(addrOut, "valid")
+        case DaisyLoad => wsub(chainDataIo("load"), "valid")
+      }
       def memPortConnects(s: Statement): Statement = {
         s match {
           case Connect(info, loc, expr) => kind(loc) match {
             case MemKind | InstanceKind if weq(loc, ce._1) =>
-              repl(loc.serialize) = (
-                if (ce._2) and(not(wsub(addrOut, "valid")), expr) // inverted port
-                else or(wsub(addrOut, "valid"), expr))
-            case MemKind | InstanceKind if weq(loc, re._1) =>
-              repl(loc.serialize) = (
-                if (re._2) and(not(wsub(addrOut, "valid")), expr) // inverted port
-                else or(wsub(addrOut, "valid"), expr))
+              val locs = loc.serialize
+              val exprx = repl getOrElse (locs, expr)
+              repl(locs) =
+                if (ce._2) and(not(addrValid), exprx) /* inverted port */ 
+                else or(addrValid, exprx)
+            case MemKind | InstanceKind if weq(loc, en._1) =>
+              val locs = loc.serialize
+              val exprx = repl getOrElse (locs, expr)
+              repl(locs) =
+                if (en._2) and(not(addrValid), exprx) /* inverted port */
+                else or(addrValid, exprx)
+            case MemKind | InstanceKind if mask._1 exists (weq(loc, _)) =>
+              val locs = loc.serialize
+              val width = bitWidth(loc.tpe).toInt
+              val exprx = repl getOrElse (locs, expr)
+              repl(locs) =
+                if (mask._2) and(cat(Seq.fill(width)(not(addrValid))), exprx) /* inverted port */
+                else or(cat(Seq.fill(width)(addrValid)), exprx)
             case MemKind | InstanceKind if weq(loc, addr) =>
-              repl(loc.serialize) = Mux(wsub(addrOut, "valid"), wsub(addrOut, "bits"), expr, ut)
+              val locs = loc.serialize
+              val exprx = repl getOrElse (locs, expr)
+              repl(locs) = Mux(addrValid, wsub(addrOut, "bits"), exprx, ut)
             case _ =>
           }
           case _ =>
@@ -293,27 +347,29 @@ class AddDaisyChains(
         s map memPortConnects
       }
       memPortConnects(m.body)
-      if (chainType == ChainType.SRAM) stmts ++= Seq(
-        // <daisy_chain>.io.addr[i].in.bits <- <memory>.data
-        Connect(NoInfo, wsub(addrIn, "bits"), netlist(addr)),
-        // <daisy_chain>.io.addr[i].in.valid <- <memory>.en
-        Connect(NoInfo, wsub(addrIn, "valid"), (ce._1, re._1) match {
-          case (EmptyExpression, ex) =>
-            if (re._2) not(netlist(ex)) else netlist(ex)
-          case (ex, EmptyExpression) =>
-            if (ce._2) not(netlist(ex)) else netlist(ex)
-          case (ex1, ex2) => and(
-            if (ce._2) not(netlist(ex1)) else netlist(ex1),
-            if (re._2) not(netlist(ex1)) else netlist(ex1))
-        })
-      )
-      cat(create_exps(data).reverse)
+      (chainType, daisyKind) match {
+        case (ChainType.SRAM, DaisyScan) => stmts ++= Seq(
+          // <daisy_chain>.io.addr[i].in.bits <- <memory>.data
+          Connect(NoInfo, wsub(addrIn, "bits"), netlist(addr)),
+          // <daisy_chain>.io.addr[i].in.valid <- <memory>.en
+          Connect(NoInfo, wsub(addrIn, "valid"), (ce._1, en._1) match {
+            case (EmptyExpression, ex) =>
+              if (en._2) not(netlist(ex)) else netlist(ex)
+            case (ex, EmptyExpression) =>
+              if (ce._2) not(netlist(ex)) else netlist(ex)
+            case (ex1, ex2) => and(
+              if (ce._2) not(netlist(ex1)) else netlist(ex1),
+              if (en._2) not(netlist(ex1)) else netlist(ex1))
+          }))
+        case _ =>
+      }
+      create_exps(data).reverse
     }
 
     def daisyConnects(elems: Statements, width: Int, daisyLen: Int, daisyWidth: Int): Seq[Statement] = {
       if (netlist.isEmpty) buildNetlist(netlist)(m.body)
       val stmts = new Statements
-      val dataCat = cat(elems.zipWithIndex map daisyConnect(stmts))
+      val dataCat = cat(elems.zipWithIndex flatMap daisyConnect(stmts, DaisyScan))
       val dataConnects = {
         ((0 until daisyLen foldRight (Seq[Connect](), width - 1)){ case (i, (stmts, high)) =>
           val low = (high - daisyWidth + 1) max 0
@@ -329,7 +385,19 @@ class AddDaisyChains(
           }), high - daisyWidth)
         })._1
       }
-      dataConnects ++ stmts 
+      val loads = elems.zipWithIndex flatMap daisyConnect(stmts, DaisyLoad)
+      val loadPort = cat(((daisyLen - 1) to 0 by -1) map (i => widx(wsub(chainDataIo("load"), "bits"), i)))
+      val loadConnects = {
+        ((loads foldLeft (Seq[Conditionally](), daisyLen * daisyWidth - 1)){ case ((stmts, high), load) =>
+          val low = high - bitWidth(load.tpe).toInt + 1
+          // <memory>.data <- <daisy_chain>.io.dataIo.load.bits
+          val stmt = Conditionally(NoInfo, wsub(chainDataIo("load"), "valid"),
+            Connect(NoInfo, load, bits(loadPort, high, low)), EmptyStmt)
+          assert(low >= 0)
+          (stmts :+ stmt, low - 1)
+        })._1
+      }
+      dataConnects ++ loadConnects ++ stmts
     }
 
     val chainElems = new Statements
@@ -357,6 +425,8 @@ class AddDaisyChains(
         Connect(NoInfo, wsub(chainIo(), "stall"), not(wref("targetFire"))),
         // <daisy_chain>.io.restart <- <daisy_port>.restart
         Connect(NoInfo, wsub(chainIo(), "restart"), daisyPort("restart")),
+        // <daisy_chain>.io.load <- daisyPort.load
+        Connect(NoInfo, wsub(chainIo(), "load"), daisyPort("load")),
          // <daiy_port>.out <- <daisy_chain>.io.dataIo.out
         Connect(NoInfo, daisyPort("out"), chainDataIo("out"))
       )
@@ -416,11 +486,13 @@ class AddDaisyChains(
                   clock: Option[Expression],
                   stmts: Statements)
                   (s: Statement): Statement = s match {
-    // Connect restart pins
-    case s: WDefInstance if !(srams contains s.module) => Block(Seq(s,
-      Connect(NoInfo, childDaisyPort(s.name)("restart")(ChainType.SRAM), daisyPort("restart")(ChainType.SRAM)),
-      Connect(NoInfo, childDaisyPort(s.name)("restart")(ChainType.RegFile), daisyPort("restart")(ChainType.RegFile))
-    ))
+    // Connect load/restart pins
+    case s: WDefInstance if !(srams contains s.module) => Block(Seq(s) ++
+      (ChainType.values map (t =>
+        Connect(NoInfo, childDaisyPort(s.name)("load")(t), daisyPort("load")(t)))) ++
+      (Seq(ChainType.SRAM, ChainType.RegFile) map (t =>
+        Connect(NoInfo, childDaisyPort(s.name)("restart")(t), daisyPort("restart")(t))))
+    )
     case s: DefMemory => readers get s.name match {
       case None => s
       case Some((rs, ws, wen)) =>
