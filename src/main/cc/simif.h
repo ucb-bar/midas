@@ -135,7 +135,7 @@ class simif_t
 
   protected:
     size_t tracelen;
-    sample_t* read_snapshot();
+    sample_t* read_snapshot(bool load = false);
     sample_t* read_traces(sample_t* s);
 #endif
 };

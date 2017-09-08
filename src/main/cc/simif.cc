@@ -56,6 +56,9 @@ void simif_t::init(int argc, char** argv, bool log) {
 void simif_t::target_reset(int pulse_start, int pulse_length) {
   poke(reset, 0);
   take_steps(pulse_start, true);
+#ifdef ENABLE_SNAPSHOT
+  read_snapshot(true);
+#endif
   poke(reset, 1);
   take_steps(pulse_length, true);
   poke(reset, 0);

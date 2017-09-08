@@ -236,7 +236,7 @@ static inline char* int_to_bin(char *bin, data_t value, size_t size) {
   return bin;
 }
 
-sample_t* simif_t::read_snapshot() {
+sample_t* simif_t::read_snapshot(bool load) {
   std::ostringstream snap;
   char bin[DAISY_WIDTH+1];
   for (size_t t = 0 ; t < CHAIN_NUM ; t++) {
@@ -256,12 +256,16 @@ sample_t* simif_t::read_snapshot() {
             break;
         }
         for (size_t j = 0 ; j < chain_len ; j++) {
-          snap << int_to_bin(bin, read(CHAIN_ADDR[t] + i), DAISY_WIDTH);
+          // TODO: write arbitrary values
+          if (load) write(CHAIN_IN_ADDR[t], 0);
+          data_t value = read(CHAIN_ADDR[t] + i);
+          if (!load) snap << int_to_bin(bin, value, DAISY_WIDTH);
         }
+        if (load) write(CHAIN_LOAD_ADDR[t], 1);
       }
     }
   }
-  return new sample_t(snap.str().c_str(), cycles());
+  return load ? NULL : new sample_t(snap.str().c_str(), cycles());
 }
 
 void simif_t::save_sample() {
