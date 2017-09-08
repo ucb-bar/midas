@@ -498,7 +498,7 @@ class AddDaisyChains(
       case Some((rs, ws, wen)) =>
         val mem = s.copy(readers = s.readers ++ rs, writers = s.writers ++ ws)
         stmts ++= ((rs zip ws).zipWithIndex flatMap { case ((r, w), i) =>
-          val addr = UIntLiteral(i, IntWidth(chisel3.util.log2Ceil(s.depth)))
+          val addr = UIntLiteral(i, IntWidth(chisel3.util.log2Ceil(s.depth) max 1))
           Seq(Connect(NoInfo, memPortField(mem, r, "clk"), clock.get),
               Connect(NoInfo, memPortField(mem, r, "en"), one),
               Connect(NoInfo, memPortField(mem, r, "addr"), addr),
