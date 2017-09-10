@@ -132,7 +132,19 @@ void simif_t::step(int n, bool blocking) {
   if (n == 0) return;
   assert(n > 0);
 #ifdef ENABLE_SNAPSHOT
-  reservoir_sampling(n);
+  if (sample_cycle == 0) {
+    reservoir_sampling(n);
+  } else if ((t + n) > sample_cycle && (t + n) - sample_cycle <= tracelen) {
+    fprintf(stderr, "Snapshot at %llu\n", t);
+    // flush trace buffer
+    trace_count = std::min((size_t)(t + n), tracelen);
+    read_traces(NULL);
+    trace_count = 0;
+    // take a snaphsot
+    last_sample = read_snapshot();
+    last_sample_id = 0;
+  }
+  delta = n;
 #endif
   // take steps
   if (log) fprintf(stderr, "* STEP %d -> %llu *\n", n, (t + n));
@@ -160,6 +172,10 @@ void simif_t::detect_assert() {
     assert_cycle |= ((uint64_t)read(ASSERTWIDGET(cycle_high))) << 32;
     std::cerr << msgs[read(ASSERTWIDGET(id))];
     std::cerr << " at cycle: " << assert_cycle << std::endl;
+#ifdef ENABLE_SNAPSHOT
+    trace_count = assert_cycle - (t - delta);
+#endif
+    finish();
     exit(EXIT_FAILURE);
   }
 }

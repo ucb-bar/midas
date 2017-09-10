@@ -16,6 +16,7 @@ void simif_t::init_sampling(int argc, char** argv) {
   profile = false;
   sample_count = 0;
   sample_time = 0;
+  sample_cycle = 0;
   tracelen = TRACE_MAX_LEN;
   trace_count = 0;
 
@@ -26,6 +27,9 @@ void simif_t::init_sampling(int argc, char** argv) {
     }
     if (arg.find("+samplenum=") == 0) {
       sample_num = strtol(arg.c_str() + 11, NULL, 10);
+    }
+    if (arg.find("+sample-cycle=") == 0) {
+      sample_cycle = strtoll(arg.c_str() + 14, NULL, 10);
     }
     if (arg.find("+tracelen=") == 0) {
       tracelen = strtol(arg.c_str() + 10, NULL, 10);
@@ -223,6 +227,10 @@ sample_t* simif_t::read_traces(sample_t *sample) {
         sample->add_cmd(new expect_t(IN_TR_READY, id, value));
       }
     }
+  }
+
+  if (sample && sample_cycle > 0) {
+    sample->add_cmd(new step_t(5)); // to catch assertions in replay
   }
 
   return sample;
