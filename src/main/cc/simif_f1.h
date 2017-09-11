@@ -11,7 +11,7 @@
 class simif_f1_t: public virtual simif_t
 {
   public:
-    simif_f1_t();
+    simif_f1_t(int argc, char** argv);
     virtual ~simif_f1_t();
     virtual void write(size_t addr, uint32_t data);
     virtual uint32_t read(size_t addr);
