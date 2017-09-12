@@ -13,7 +13,10 @@ This repo depends on the following projects:
 Thie repo is not supposed to work alone. It is instantiated in top-level projects with target designs such as [strober-examples](https://github.com/donggyukim/strober-examples) and [midas-top](https://github.com/ucb-bar/midas-top.git).
 
 ## How to Use?
-To generate the Verilog file of the FPGA simulator, just pass the target design with a configuration:
+
+### MIDAS Compiler
+
+To generate the Verilog file of the FPGA simulator, just pass the target design with a configuration to `MidasCompiler`:
 ```scala
 // mod: Module (target design)
 // dir: File (target directory)
@@ -28,3 +31,16 @@ midas.MidasCompiler(mod, dir, Some(lib))(p)
 ```
 
 Here are two examples in [strober-example](https://github.com/donggyukim/strober-examples/blob/master/src/main/scala/Main.scala) and [midas-top](https://github.com/ucb-bar/midas-top/blob/master/src/main/scala/Generator.scala#L161).
+
+### MIDAS Configurations
+
+The default MIDAS parameters are given in [src/main/scala/midas/Config.scala](https://github.com/ucb-bar/midas/blob/readme/src/main/scala/midas/Config.scala). You can just pass `ZynqConfig` to obtain performance simulation and `ZynqConfigWithSnapshot` to plug Strober in for power/energy simulation for Xilinx Zynq boards.
+
+You may want to override some parameters on top of the default parameter values. This is an example how you can instantiate an MIDAS LLC model:
+```scala
+class WithMidasLLC(extends Config((site, here, up) => {
+  case MidasLLCKey => Some(MidasLLCParameters(nWays = 8, nSets = 4096, blockBytes = 128)) // capacity <= 4MiB
+})
+
+class ZynqConfigWithLLC(new ZynqConfig ++ new WithMidasLLC)
+```
