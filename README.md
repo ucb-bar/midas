@@ -1,6 +1,6 @@
-# MIDAS
+# MIDAS Beta v0.1
 
-MIDAS is an FPGA simulation simulation framework that automatically generates platform agnostic FPGA simulators from any RTL designs. MIDAS is an improvement over [Strober](http://dl.acm.org/citation.cfm?id=3001151) that was originally implemented for sample-based energy simulation.
+MIDAS is an FPGA simulation simulation framework that automatically generates platform agnostic FPGA simulators from any RTL designs. MIDAS is an improvement over [Strober](http://dl.acm.org/citation.cfm?id=3001151) that was originally developed for sample-based energy simulation.
 
 ## Dependencies
 
@@ -12,11 +12,11 @@ This repo depends on the following projects:
 
 Thie repo is not supposed to work alone. It is instantiated in top-level projects with target designs such as [strober-examples](https://github.com/donggyukim/strober-examples) and [midas-top](https://github.com/ucb-bar/midas-top.git).
 
-## How to Use?
+## Get Started
 
 ### MIDAS Compiler
 
-To generate the Verilog file of the FPGA simulator, just pass the target design with a configuration to `MidasCompiler`:
+First of all, we assume the target design is written in Chisel. To generate the FPGA simulator for the target design, just pass the target design with a configuration to `MidasCompiler`:
 ```scala
 // mod: Module (target design)
 // dir: File (target directory)
@@ -44,3 +44,66 @@ class WithMidasLLC(extends Config((site, here, up) => {
 
 class ZynqConfigWithLLC(new ZynqConfig ++ new WithMidasLLC)
 ```
+
+### MIDAS Software Driver
+
+To take control of FPGA simulation, the software driver is suppposed to be written in C++ by the users. The simplest way to write is use `peek`, `poke`, `step` functions as in Chisel testers. The first step is write a virtual class shared by emulation and various platforms. This is a software driver for GCD (e.g. in `GCD.h`) by inheriting `simif_t` as an example:
+```c++
+#include "simif.h"
+
+class GCD_t: virtual simif_t
+{
+public:
+  void run() {
+    uint32_t a = 64, b = 48, z = 16; //test vectors
+    target_reset();
+    do {
+      poke(io_a, a);
+      poke(io_b, b);
+      poke(io_e, cycles() == 0 ? 1 : 0);
+      step(1);
+    } while (cycles() <= 1 || peek(io_v) == 0);
+    expect(io_z, z);
+  }
+};
+```
+
+Next, to emulate and test the FPGA simulator itself, a drieved class is written (e.g. in `GCD-emul.cc`) as follow:
+
+```c++
+#include "simif_emul.h"
+#include "GCD.h"
+
+class GCD_emul_t:
+  public simif_emul_t,
+  public GCD_t { };
+
+int main(int argc, char** argv)
+{
+  GCD_emul_t GCD;
+  GCD.init(argc, argv, true);
+  GCD.run();
+  return GCD.finish();
+}
+```
+
+For FPGA simulation in Xilinx Zynq, the code (e.g. in `GCD-zynq.cc`) is written in the same way inheriting `simif_zynq_t` instead of `simif_emul_t`:
+
+```c++
+#include "simif_zynq.h"
+#include "GCD.h"
+
+class GCD_zynq_t:
+  public simif_zynq_t,
+  public GCD_t { };
+
+int main(int argc, char** argv) 
+{
+  GCD_zynq_t GCD;
+  GCD.init(argc, argv, true);
+  GCD.run();
+  return GCD.finish();
+}
+```
+
+In this way, we can reduce lots of code duplication for emulation and various platforms when the software driver becomes complicated.
