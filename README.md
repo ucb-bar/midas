@@ -123,3 +123,30 @@ The variables are:
 * `OUT_DIR`: The directory for output files (`GEN_DIR` by default)
 * `DRIVER`: The driver files written by the user (not including header files)
 * `CXXFLAGS`: additional compiler flags
+
+### FPGA Simulation Synthesis
+
+To compile the FPGA simulator, platform specific backend flows are provided. For now, [the Xilinx Zynq backend](https://github.com/ucb-bar/midas-zynq) is supported by modifying [RocketChip fpga-zynq](https://github.com/ucb-bar/midas-zynq).
+
+### Run emulation / FPGA simulation
+
+To run emulation / FPGA simulation, simply run:
+```
+cd <output_dir>
+./[binary executable] [+<argument>=<value>]
+```
+
+The argument list is as follows:
+* `+mm_MEM_LATENCY=`: the DRAM latency (required)
+* `+mm_LLC_LATENCY=`: the LLC latency (required when using the LLC model)
+* `+mm_LLC_WAY_BITS=`: log2(#(LLC ways)) (required when using the LLC model)
+* `+mm_LLC_SET_BITS=`: log2(#(LLC sets)) (required when using the LLC model)
+* `+mm_LLC_BLOCK_BITS=`: log2(#(LLC block size)) (required when using the LLC model)
+* `+loadmem=`: hex file to initialize the main memory
+* `+fastloadmem`: enables fast loadmem, not through the loadmem unit (emulation only)
+* `+seed=`: seed value for the random generator (optional)
+* `+sample=`: file name for sample snapshots (strober only)
+* `+samplenum=`: number of sample snapshots (strober only)
+* `+tracelen=`: the length of I/O traces (strober only)
+
+Note that emulation and FPGA simulation share most command-line arguments.
