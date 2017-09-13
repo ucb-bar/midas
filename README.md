@@ -47,7 +47,7 @@ class ZynqConfigWithLLC(new ZynqConfig ++ new WithMidasLLC)
 
 ### MIDAS Software Driver
 
-To take control of FPGA simulation, the software driver is suppposed to be written in C++ by the users. The simplest way to write is use `peek`, `poke`, `step` functions as in Chisel testers. The first step is write a virtual class shared by emulation and various platforms. This is a software driver for GCD (e.g. in `GCD.h`) by inheriting `simif_t` as an example:
+To take control of FPGA simulation, the software driver is suppposed to be written in C++ by the users. The simplest way to write is use `peek`, `poke`, `step`, `expect` functions as in Chisel testers. The first step is write a virtual class shared by emulation and various platforms. This is a software driver for GCD (e.g. in `GCD.h`) by inheriting `simif_t` as an example:
 ```c++
 #include "simif.h"
 
@@ -107,3 +107,19 @@ int main(int argc, char** argv)
 ```
 
 In this way, we can reduce lots of code duplication for emulation and various platforms when the software driver becomes complicated.
+
+Big numbers more than 64 bits can be defined by `mpz_t` in [GMP](https://gmplib.org/), and passed to `peek`, `poke`, `expect` functions.
+
+To compile the driver, `make` is invoked in `src/main/cc`. Thus, the top-level makefile is likely to contain the wrapper as follows:
+```makefile
+compile-driver:
+  $(MAKE) -C $(midas_dir)/src/main/cc [verilator | vcs | zynq] [variable="<value>"]*
+```
+
+The variables are:
+* `PLATFORM`: Platform name (zynq by default)
+* `DESIGN`: Target design name
+* `GEN_DIR`: The directory containing generated files from MIDAS Compiler (=`dir`)
+* `OUT_DIR`: The directory for output files (`GEN_DIR` by default)
+* `DRIVER`: The driver files written by the user (not including header files)
+* `CXXFLAGS`: additional compiler flags
