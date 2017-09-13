@@ -150,3 +150,9 @@ The argument list is as follows:
 * `+tracelen=`: the length of I/O traces (strober only)
 
 Note that emulation and FPGA simulation share most command-line arguments.
+
+### Templates / Examples
+
+There are two templates you can start with:
+* [strober-example](https://github.com/donggyukim/strober-examples.git): Strober for very simple and small examples.
+* [midas-top](https://github.com/ucb-bar/midas-zynq.git): MIDAS/Strober for RocketChip and BOOM.
