@@ -156,3 +156,14 @@ Note that emulation and FPGA simulation share most command-line arguments.
 There are two templates you can start with:
 * [strober-example](https://github.com/donggyukim/strober-examples.git): Strober for very simple and small examples.
 * [midas-top](https://github.com/ucb-bar/midas-zynq.git): MIDAS/Strober for RocketChip and BOOM.
+
+## Internal Architecture
+
+This section describes the internal architecture of MIDAS for advanced users.
+
+### Custom Transforms in the MIDAS Complier
+
+The MIDAS compiler composes custom compiler passes to generate FPGA simulators as follows:
+![compiler](doc/images/complier.png)
+
+Note that the MIDAS compiler operates on low firrtl to take advantage of low-level optimizations from the FIRRTL compiler.
