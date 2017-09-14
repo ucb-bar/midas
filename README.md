@@ -167,3 +167,16 @@ The MIDAS compiler composes custom compiler passes to generate FPGA simulators a
 ![compiler](doc/images/complier.png)
 
 Note that the MIDAS compiler operates on low firrtl to take advantage of low-level optimizations from the FIRRTL compiler.
+
+### Macro Mapping (Optional)
+
+*Macro Mapping* maps technology-independent macro blocks to technology-dependent macro blocks(SRAMs). This pass is initiated by passing the JSON description to the MIDAS compiler. For implementation details, refer to [barstools](https://github.com/ucb-bar/barstools).
+
+### FAME1 Transform
+[*FAME1 transform*](src/main/scala/midas/passes/Fame1Transform.scala) decouples the target clock from the host clock by attaching enable signals to all state elements. This enables FPGA performance simulators to stall when timing tokens are not ready. With FAME1 transforms, we can easily control the execution of FPGA simulation with timing token flow controls. The details of this transform are found in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
+
+### Scan Chain Insertion (Optional)
+[*Scan chain insertion*](src/main/scala/strober/passes/AddDaisyChain.scala) add scan chains to take RTL state snapshots for sample replays. Notably, [*all scan chains are implemented in Chisel*](src/main/scala/strober/core/DaisyChain.scala), and this pass compiles the Chisel designs by invoking the FIRRTL compiler inside a FIRRTL pass. This technique reduces  The details of scan chains are found in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
+
+### Simulation Mapping
+[*Simulation mapping*](src/main/scala/midas/passes/SimulationMapping.scala) wraps the transformed target design by inserting timing token channels / trace buffers. The result is a platform-independent simulation module for token-based simulation. This pass also invokes the FIRRTL compiler to compile [the wrapper written in Chisel](src/main/scala/midas/core/SimWrapper.scala). The details on communication channels and token-based simulation are found in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
