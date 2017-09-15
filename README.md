@@ -164,7 +164,7 @@ This section describes the internal architecture of MIDAS for advanced users.
 ### Custom Transforms in the MIDAS Complier
 
 The [`MidasTransforms`](src/main/scala/midas/passes/MidasTransforms.scala) composes custom compiler passes to generate FPGA simulators as follows:
-![compiler](doc/images/complier.png)
+![transforms](doc/images/transforms.png)
 
 Note that the MIDAS compiler operates on low firrtl to take advantage of low-level optimizations from the FIRRTL compiler.
 
