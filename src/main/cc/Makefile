@@ -117,7 +117,7 @@ verilator-debug: $(OUT_DIR)/V$(DESIGN)-debug $(OUT_DIR)/$(DESIGN).chain $(OUT_DI
 # Compile VCS emulation binary
 VCS ?= vcs -full64
 override VCS_FLAGS := -quiet -timescale=1ns/1ps +v2k +rad +vcs+initreg+random +vcs+lic+wait \
-	-debug_pp +no_notifier -e vcs_main -cpp $(CXX) \
+	 -notice -line +lint=all,noVCDE,noONGS,noUI -quiet -debug_pp +no_notifier -e vcs_main -cpp $(CXX) \
 	-CFLAGS "$(CXXFLAGS) -I$(emul_gmp_install_dir)/include -DVCS -I$(VCS_HOME)/include" \
 	-LDFLAGS "$(LDFLAGS) -L$(emul_gmp_install_dir)/lib -lgmp -lmidas" \
 	+define+CLOCK_PERIOD=$(CLOCK_PERIOD) \

@@ -4,7 +4,7 @@ package widgets
 import chisel3._
 import chisel3.util._
 import junctions._
-import config.{Parameters, Field}
+import freechips.rocketchip.config.{Parameters, Field}
 
 case class MidasLLCParameters(nWays: Int, nSets: Int, blockBytes: Int)
 case object MidasLLCKey extends Field[Option[MidasLLCParameters]]

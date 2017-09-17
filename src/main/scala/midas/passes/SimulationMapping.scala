@@ -13,7 +13,7 @@ import java.io.{File, FileWriter, StringWriter}
 
 private[passes] class SimulationMapping(
     io: chisel3.Data)
-   (implicit param: config.Parameters) extends firrtl.passes.Pass {
+   (implicit param: freechips.rocketchip.config.Parameters) extends firrtl.passes.Pass {
   
   override def name = "[midas] Simulation Mapping"
 

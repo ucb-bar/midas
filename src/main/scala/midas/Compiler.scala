@@ -1,5 +1,6 @@
 package midas
 
+import freechips.rocketchip.config.Parameters
 import chisel3.{Data, Bundle}
 import firrtl.ir.Circuit
 import firrtl.CompilerUtils.getLoweringTransforms
@@ -8,10 +9,9 @@ import barstools.macros._
 import java.io.{File, FileWriter, Writer}
 
 // Compiler for Midas Transforms
-private class MidasCompiler(dir: File, io: Data)(implicit param: config.Parameters) extends firrtl.Compiler {
+private class MidasCompiler(dir: File, io: Data)(implicit param: Parameters) extends firrtl.Compiler {
   def emitter = new firrtl.LowFirrtlEmitter
-  def transforms =
-    getLoweringTransforms(firrtl.ChirrtlForm, firrtl.MidForm) ++ Seq(
+  def transforms = getLoweringTransforms(firrtl.ChirrtlForm, firrtl.MidForm) ++ Seq(
     new InferReadWrite,
     new ReplSeqMem) ++
     getLoweringTransforms(firrtl.MidForm, firrtl.LowForm) ++ Seq(
@@ -31,7 +31,7 @@ object MidasCompiler {
       io: Data,
       dir: File,
       lib: Option[File])
-     (implicit p: config.Parameters): Circuit = {
+     (implicit p: Parameters): Circuit = {
     val conf = new File(dir, s"${chirrtl.main}.conf")
     val json = new File(dir, s"${chirrtl.main}.macros.json")
     val annotations = new firrtl.AnnotationMap(Seq(
@@ -54,7 +54,7 @@ object MidasCompiler {
   }
 
   def apply[T <: chisel3.experimental.RawModule](w: => T, dir: File, libFile: Option[File])
-      (implicit p: config.Parameters): Circuit = {
+      (implicit p: Parameters): Circuit = {
     dir.mkdirs
     lazy val target = w
     val chirrtl = firrtl.Parser.parse(chisel3.Driver.emit(() => target))
@@ -62,11 +62,12 @@ object MidasCompiler {
     class RCBundle extends Bundle {
         val clock = target.getPorts(0).id.cloneType
         val reset = target.getPorts(1).id.cloneType
-        val mem_axi4 = target.getPorts(2).id.cloneType
-        val serial = target.getPorts(3).id.cloneType
-        val uarts = target.getPorts(4).id.cloneType
-        val net = target.getPorts(5).id.cloneType
-        val bdev = target.getPorts(6).id.cloneType
+        // Skip Debug port
+        val mem_axi4 = target.getPorts(3).id.cloneType
+        val serial = target.getPorts(4).id.cloneType
+        val uart = target.getPorts(5).id.cloneType
+        val net = target.getPorts(6).id.cloneType
+        val bdev = target.getPorts(7).id.cloneType
 
         override def cloneType = new RCBundle().asInstanceOf[this.type]
     }
