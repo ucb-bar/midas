@@ -40,17 +40,16 @@ private[passes] class AssertPass(
   private def findMessages(mname: String)
                           (s: Statement): Statement =
     s map findMessages(mname) match {
-      case s: Print if param(EnableDebug) =>
+      case s: Print if param(EnableDebug) && s.args.isEmpty =>
         asserts(mname) get s.en.serialize match {
           case Some((idx, str)) =>
-            assert(s.args.isEmpty)
             messages(mname)(idx) = s.string.serialize
-            EmptyStmt
-          case None if param(EnablePrint) =>
-            prints(mname) += s
             EmptyStmt
           case _ => s
         }
+      case s: Print if param(EnablePrint) && s.args.nonEmpty =>
+        prints(mname) += s
+        EmptyStmt
       case s => s
     }
 
