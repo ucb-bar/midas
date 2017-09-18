@@ -139,6 +139,11 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     assertWidget.reset := reset || simReset
     assertWidget.io.assert <> simIo.assert
     createResetQueue(assertWidget.io.tReset)
+  } else true.B) && (if (p(EnablePrint) && p(PrintPorts).nonEmpty) {
+    val printWidget = addWidget(new PrintWidget, "PrintWidget")
+    printWidget.reset := reset || simReset
+    printWidget.io.prints <> simIo.prints
+    createResetQueue(printWidget.io.tReset)
   } else true.B) && (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {
