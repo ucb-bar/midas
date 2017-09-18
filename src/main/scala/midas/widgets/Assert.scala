@@ -14,10 +14,10 @@ class AssertWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
 class AssertWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
   val io = IO(new AssertWidgetIO)
   val resume = Wire(init=false.B)
-  val assertId = io.assert.bits >> 1
-  val assertFire = io.assert.bits(0) && !io.tReset.bits
-  val fire = io.assert.valid && io.tReset.valid && (!assertFire || resume)
   val cycles = Reg(UInt(64.W))
+  val assertId = io.assert.bits >> 1
+  val assertFire = io.assert.bits(0) && !io.tReset.bits && cycles.orR
+  val fire = io.assert.valid && io.tReset.valid && (!assertFire || resume)
   io.assert.ready := fire
   io.tReset.ready := fire
   when (fire) {
