@@ -18,6 +18,9 @@ abstract class PlatformShim(implicit p: Parameters) extends Module {
     if (p(EnableDebug) && p(midas.core.NumAsserts) > 0) {
       sb append(genMacro("ENABLE_DEBUG"))
     }
+    if (p(EnablePrint) && p(midas.core.PrintPorts).nonEmpty) {
+      sb append(genMacro("ENABLE_PRINT"))
+    }
     if (p(EnableSnapshot)) {
       sb append(genMacro("ENABLE_SNAPSHOT"))
       if (p(KeepSamplesInMem)) sb append(genMacro("KEEP_SAMPLES_IN_MEM"))

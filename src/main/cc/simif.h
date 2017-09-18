@@ -48,6 +48,14 @@ class simif_t
 #ifdef ENABLE_DEBUG
     void detect_assert();
 #endif
+#ifdef ENABLE_PRINT
+    bool detect_prints();
+    void init_prints(int argc, char** argv);
+    bool enable_prints;
+    std::array<std::string,              PRINTS_NUM> print_formats;
+    std::array<std::vector<std::string>, PRINTS_NUM> print_names;
+    std::array<std::vector<size_t>,      PRINTS_NUM> print_widths;
+#endif
 
   public:
     // Simulation APIs
@@ -57,6 +65,9 @@ class simif_t
     inline bool done() {
 #ifdef ENABLE_DEBUG
       detect_assert();
+#endif
+#ifdef ENABLE_PRINT
+      while(enable_prints && detect_prints());
 #endif
       return read(MASTER(DONE));
     }
