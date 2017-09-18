@@ -60,7 +60,10 @@ private[passes] class PlatformMapping(
 
   def run(c: Circuit) = {
     val sim = c match { case w: WCircuit => w.sim }
-    val p = param alterPartial { case core.NumAsserts => sim.numAsserts }
+    val p = param alterPartial {
+      case core.NumAsserts => sim.numAsserts
+      case core.PrintPorts => sim.printPorts
+    }
     lazy val shim = param(Platform) match {
       case Zynq     => new platform.ZynqShim(sim)(p)
       case F1       => new platform.F1Shim(sim)(p)

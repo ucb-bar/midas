@@ -12,6 +12,7 @@ case object Zynq extends PlatformType
 case object F1 extends PlatformType
 case object Platform extends Field[PlatformType]
 case object EnableDebug extends Field[Boolean]
+case object EnablePrint extends Field[Boolean]
 case object EnableSnapshot extends Field[Boolean]
 case object KeepSamplesInMem extends Field[Boolean]
 case object MemModelKey extends Field[Option[Parameters => MemModel]]
@@ -24,6 +25,7 @@ class SimConfig extends Config((site, here, up) => {
   case ChannelWidth     => 32
   case DaisyWidth       => 32
   case EnableDebug      => false
+  case EnablePrint      => false
   case EnableSnapshot   => false
   case KeepSamplesInMem => true
   case CtrlNastiKey     => NastiParameters(32, 32, 12)

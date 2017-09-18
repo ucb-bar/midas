@@ -5,7 +5,7 @@ import firrtl._
 import firrtl.ir._
 import firrtl.Mappers._
 import firrtl.WrappedExpression._
-import firrtl.Utils.zero
+import firrtl.Utils.{zero, to_flip}
 import Utils._
 import strober.passes.{StroberMetaData, postorder}
 import java.io.{File, FileWriter, Writer}
@@ -16,11 +16,14 @@ private[passes] class AssertPass(
   override def name = "[midas] Assert Pass"
   type Asserts = collection.mutable.HashMap[String, (Int, String)]
   type Messages = collection.mutable.HashMap[Int, String]
-  type AssertModSet = collection.mutable.HashSet[String]
+  type Prints = collection.mutable.ArrayBuffer[Print]
+  type Formats = collection.mutable.ArrayBuffer[(String, Seq[String])]
 
   private val asserts = collection.mutable.HashMap[String, Asserts]()
   private val messages = collection.mutable.HashMap[String, Messages]()
-  private val ports = collection.mutable.HashMap[String, Port]()
+  private val assertPorts = collection.mutable.HashMap[String, Port]()
+  private val prints = collection.mutable.HashMap[String, Prints]()
+  private val printPorts = collection.mutable.HashMap[String, Port]()
 
   private def synAsserts(mname: String,
                          namespace: Namespace)
@@ -43,7 +46,10 @@ private[passes] class AssertPass(
             assert(s.args.isEmpty)
             messages(mname)(idx) = s.string.serialize
             EmptyStmt
-          case None => s
+          case None if param(EnablePrint) =>
+            prints(mname) += s
+            EmptyStmt
+          case _ => s
         }
       case s => s
     }
@@ -53,37 +59,88 @@ private[passes] class AssertPass(
     val namespace = Namespace(m)
     asserts(m.name) = new Asserts
     messages(m.name) = new Messages
+    prints(m.name) = new Prints
+
+    def getChildren(ports: collection.mutable.Map[String, Port]) = {
+      (meta.childInsts(m.name) foldRight Seq[(String, Port)]())(
+        (x, res) => ports get meta.instModMap(x -> m.name) match {
+          case None    => res
+          case Some(p) => res :+ (x -> p)
+        }
+      )
+    }
+
     (m map synAsserts(m.name, namespace)
        map findMessages(m.name)) match {
       case m: Module =>
-        val children = (meta.childInsts(m.name) foldRight Seq[(String, Port)]())(
-          (x, res) => ports get meta.instModMap(x -> m.name) match {
-            case None    => res
-            case Some(p) => res :+ (x -> p)
-          }
-        )
-        val width = asserts(m.name).size + ((children foldLeft 0)(
+        val ports = collection.mutable.ArrayBuffer[Port]()
+        val stmts = collection.mutable.ArrayBuffer[Statement]()
+        // Connect asserts
+        val assertChildren = getChildren(assertPorts)
+        val assertWidth = asserts(m.name).size + ((assertChildren foldLeft 0)(
           (res, x) => res + firrtl.bitWidth(x._2.tpe).toInt))
-        if (width == 0) m else {
-          val tpe = UIntType(IntWidth(width))
+        if (assertWidth > 0) {
+          val tpe = UIntType(IntWidth(assertWidth))
           val port = Port(NoInfo, namespace.newName("midasAsserts"), Output, tpe)
           val stmt = Connect(NoInfo, WRef(port.name), cat(
-            (children map (x => wsub(wref(x._1), x._2.name))) ++
+            (assertChildren map (x => wsub(wref(x._1), x._2.name))) ++
             (asserts(m.name).values.toSeq sortWith (_._1 > _._1) map (x => wref(x._2)))))
-          ports(m.name) = port
-          m.copy(ports = m.ports :+ port, body = Block(Seq(m.body, stmt)))
+          assertPorts(m.name) = port
+          ports += port
+          stmts += stmt
         }
+        // Connect prints
+        val printChildren = getChildren(printPorts)
+        if (printChildren.size + prints(m.name).size > 0) {
+          val tpe = BundleType((printChildren flatMap { case (child, p) => p.tpe match {
+              // Field(child, Default, p.tpe)
+              case BundleType(fs) => fs map (f => f.copy(name=s"${child}_${f.name}")) }
+            }) ++ (prints(m.name).zipWithIndex map { case (print, idx) =>
+              val width = (print.args foldLeft 1)((res, arg) => res + bitWidth(arg.tpe).toInt)
+              Field(s"print_${idx}", Default, UIntType(IntWidth(width)))
+            })
+          )
+          val port = Port(NoInfo, namespace.newName("midasPrints"), Output, tpe)
+          printPorts(m.name) = port
+          ports += port
+          stmts ++= (printChildren flatMap { case (child, p) => p.tpe match {
+            case BundleType(fs) => fs map (f =>
+              Connect(NoInfo, wsub(WRef(port.name), s"${child}_${f.name}"),
+                              wsub(wsub(WRef(child), p.name), f.name)))
+          }}) ++ (prints(m.name).zipWithIndex map { case (print, idx) =>
+              Connect(NoInfo, wsub(WRef(port.name), s"print_${idx}"),
+                              cat(print.args.reverse :+ print.en))
+          })
+        }
+        m.copy(ports = m.ports ++ ports.toSeq, body = Block(m.body +: stmts.toSeq))
       case m: ExtModule => m
     }
   }
 
+  trait DumpType
+  case object DumpAsserts extends DumpType {
+    override def toString = "asserts"
+  }
+  case object DumpPrints extends DumpType {
+    override def toString = "prints"
+  }
   private var assertNum = 0
-  def dump(writer: Writer, meta: StroberMetaData, mod: String, path: String) {
-    asserts(mod).values.toSeq sortWith (_._1 < _._1) foreach { case (idx, _) =>
-      writer write s"[id: $assertNum, module: $mod, path: $path]\n"
-      writer write (messages(mod)(idx) replace ("""\n""", "\n"))
-      writer write "0\n"
-      assertNum += 1
+  private var printNum = 0
+  def dump(writer: Writer, meta: StroberMetaData, mod: String, path: String)(implicit t: DumpType) {
+    t match {
+      case DumpAsserts => asserts(mod).values.toSeq sortWith (_._1 < _._1) foreach { case (idx, _) =>
+        writer write s"[id: $assertNum, module: $mod, path: $path]\n"
+        writer write (messages(mod)(idx) replace ("""\n""", "\n"))
+        writer write "0\n"
+        assertNum += 1
+      }
+      case DumpPrints => prints(mod) foreach { print =>
+        writer write """%s""".format(print.string.serialize)
+        writer write s"\n"
+        writer write (print.args map (arg => s"${path}.${arg.serialize} ${bitWidth(arg.tpe)}") mkString " ")
+        writer write s"\n"
+        printNum += 1
+      }
     }
     meta.childInsts(mod) foreach { child =>
       dump(writer, meta, meta.instModMap(child, mod), s"${path}.${child}")
@@ -93,10 +150,17 @@ private[passes] class AssertPass(
   def run(c: Circuit) = {
     val meta = StroberMetaData(c)
     val mods = postorder(c, meta)(transform(meta))
-    val f = new FileWriter(new File(dir, s"${c.main}.asserts"))
-    dump(f, meta, c.main, c.main)
-    f.close
-    println(s"[midas] total # of assertions: $assertNum")
-    new DCircuit(c.info, mods, c.main, assertNum)
+    Seq(DumpAsserts, DumpPrints) foreach { t =>
+      val f = new FileWriter(new File(dir, s"${c.main}.${t}"))
+      dump(f, meta, c.main, c.main)(t)
+      f.close
+    }
+    if (assertNum > 0) {
+      println(s"[midas] total # of assertions: $assertNum")
+    }
+    if (printNum > 0) {
+      println(s"[midas] total # of prints: $printNum")
+    }
+    c.copy(modules = mods)
   }
 }
