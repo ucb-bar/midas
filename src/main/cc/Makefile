@@ -46,8 +46,9 @@ include $(util_dir)/utils.mk
 $(OUT_DIR)/dramsim2_ini: $(r_dir)/dramsim2_ini
 	ln -sf $< $@
 
-$(OUT_DIR)/$(DESIGN).chain:
-	$(if $(wildcard $(GEN_DIR)/$(DESIGN).chain),cp $(GEN_DIR)/$(DESIGN).chain $@,)
+dump_files := $(addsuffix $(OUT_DIR)/$(DESIGN).,chain asserts prints)
+$(dump_files):
+	$(if $(wildcard $(GEN_DIR)/$(notdir $@)),cp $(GEN_DIR)/$(notdir $@) $@,)
 
 override CXXFLAGS += -I$(midas_dir) -I$(util_dir) $(foreach f, $(DRIVER), -I$(dir $(f)))
 override LDFLAGS := $(LDFLAGS) -L$(GEN_DIR) -lstdc++ -lpthread 
@@ -60,10 +61,11 @@ endpoint_o := $(patsubst $(endpoint_dir)/%.cc, $(GEN_DIR)/%.o, $(endpoint_cc))
 $(endpoint_o): $(GEN_DIR)/%.o: $(endpoint_dir)/%.cc $(GEN_DIR)/$(DESIGN)-const.h $(endpoint_h) $(platform_gmp)
 	$(CXX) $(CXXFLAGS) -I$(platform_gmp_install_dir)/include -c -o $@ $< -include $(word 2, $^)
 
+addon_files := sample/simif_sample debug/simif_debug
 platform_files := simif simif_$(PLATFORM) sample/sample
 platform_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(platform_files)))
-platform_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(platform_files) sample/simif_sample))
-platform_o := $(addprefix $(GEN_DIR)/, $(addsuffix .o, $(platform_files) sample/simif_sample))
+platform_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(platform_files) $(addon_files)))
+platform_o := $(addprefix $(GEN_DIR)/, $(addsuffix .o, $(platform_files) $(addon_files)))
 
 $(platform_o): $(GEN_DIR)/%.o: $(midas_dir)/%.cc $(GEN_DIR)/$(DESIGN)-const.h $(platform_h) $(platform_gmp)
 	mkdir -p $(dir $@)
@@ -74,11 +76,11 @@ $(OUT_DIR)/$(DESIGN)-$(PLATFORM): $(GEN_DIR)/$(DESIGN)-const.h $(lib) $(DRIVER) 
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -I$(platform_gmp_install_dir)/include -include $< \
 	-o $@ $(DRIVER) $(dramsim_o) $(lib_o) $(platform_o) $(endpoint_o) $(platform_gmp)
 
-$(PLATFORM): $(OUT_DIR)/$(DESIGN)-$(PLATFORM) $(OUT_DIR)/$(DESIGN).chain
+$(PLATFORM): $(OUT_DIR)/$(DESIGN)-$(PLATFORM) $(dump_Files) 
 
 emul_files := simif simif_emul emul/mmio_$(PLATFORM) sample/sample
 emul_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(emul_files) emul/mmio))
-emul_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(emul_files) sample/simif_sample))
+emul_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(emul_files) $(addon_files)))
 emul_v := $(v_dir)/emul_$(PLATFORM).v
 
 # Compile verilator emulation binary
@@ -111,8 +113,8 @@ $(OUT_DIR)/V$(DESIGN)-debug: $(GEN_DIR)/$(DESIGN)-const.h $(design_v) $(lib) $(e
 	-o $@ $(design_v) $(DRIVER) $(emul_cc) $(endpoint_cc)
 	$(MAKE) -C $(GEN_DIR)/V$(DESIGN)-debug.csrc -f V$(top_module).mk
 
-verilator: $(OUT_DIR)/V$(DESIGN) $(OUT_DIR)/$(DESIGN).chain $(OUT_DIR)/dramsim2_ini
-verilator-debug: $(OUT_DIR)/V$(DESIGN)-debug $(OUT_DIR)/$(DESIGN).chain $(OUT_DIR)/dramsim2_ini
+verilator: $(OUT_DIR)/V$(DESIGN) $(dump_files) $(OUT_DIR)/dramsim2_ini
+verilator-debug: $(OUT_DIR)/V$(DESIGN)-debug $(dump_files) $(OUT_DIR)/dramsim2_ini
 
 # Compile VCS emulation binary
 VCS ?= vcs -full64
@@ -145,8 +147,8 @@ $(OUT_DIR)/$(DESIGN)-debug: $(GEN_DIR)/$(DESIGN)-const.h $(design_v) $(emul_v) $
 	-CFLAGS "-include $<" \
 	-o $@ $(GEN_DIR)/$(DESIGN)-const.vh $(design_v) $(emul_v) $(lib) $(DRIVER) $(emul_cc) $(endpoint_cc)
 
-vcs: $(OUT_DIR)/$(DESIGN) $(OUT_DIR)/$(DESIGN).chain $(OUT_DIR)/dramsim2_ini
-vcs-debug: $(OUT_DIR)/$(DESIGN)-debug $(OUT_DIR)/$(DESIGN).chain $(OUT_DIR)/dramsim2_ini
+vcs: $(OUT_DIR)/$(DESIGN) $(dump_files) $(OUT_DIR)/dramsim2_ini
+vcs-debug: $(OUT_DIR)/$(DESIGN)-debug $(dump_files) $(OUT_DIR)/dramsim2_ini
 
 include $(replay_dir)/replay.mk
 

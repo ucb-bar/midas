@@ -49,12 +49,18 @@ class simif_t
     void detect_assert();
 #endif
 #ifdef ENABLE_PRINT
+  public:
+    void print_format(size_t i, mpz_t& bit);
+
+  private:
     bool detect_prints();
     void init_prints(int argc, char** argv);
     bool enable_prints;
     std::array<std::string,              PRINTS_NUM> print_formats;
     std::array<std::vector<std::string>, PRINTS_NUM> print_names;
     std::array<std::vector<size_t>,      PRINTS_NUM> print_widths;
+    std::array<uint64_t,                 PRINTS_NUM> print_cycles;
+    std::array<data_t,                   PRINTS_NUM> print_stamps;
 #endif
 
   public:
