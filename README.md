@@ -1,18 +1,28 @@
 # MIDAS Beta v0.1
 
-MIDAS is an FPGA simulation simulation framework that automatically generates FPGA simulators for various FPGA platforms from any RTL designs. MIDAS is an improvement over [Strober](http://dl.acm.org/citation.cfm?id=3001151) that was originally developed for sample-based energy simulation.
+MIDAS is a simulation framework that automatically generates an FPGA-accelerated simulator from a Chisel-based RTL design. MIDAS expands on the work of [Strober](http://dl.acm.org/citation.cfm?id=3001151) that was originally developed for sample-based energy simulation.
+
+## Host vs Target 
+
+To avoid confusion, we make a distinction between *host* and *target* machines.
+
+**Target**: the machine being simulated. For example, an SoC derived from Rocket Chip.
+
+**Host**: the machine that executes ("hosts") the simulation. For example, this could be an Xilinx ZC706 (FPGA + embedded CPU), or an X86 desktop with a PCI-E attached FPGA like a Xilinx VC707, or Intel DE5.
+
+MIDAS's primary function is to generate a high-performance simulator of a *target* from its source RTL, that executes on a hybrid CPU-FPGA *host*.
 
 ## Dependencies
 
-This repo depends on the following projects:
-* [Chisel](https://github.com/freechipsproject/chisel3): RTL implementations in MIDAS/Strober are written with Chisel
-* [FIRRTL](https://github.com/freechipsproject/firrtl): Custom transforms in MIDAS/Strober are written with FIRRTL
-* [RocketChip](https://github.com/freechipsproject/rocket-chip.git): RocketChip is not only a chip generator, but also a collection of useful libraries for various hardware designs. We take advantage of some libraries in RocketChip.
-* [barstools](https://github.com/ucb-bar/barstools): Technology dependent custom transforms(e.g. macro compiler) are used for Strober.
+This repository depends on the following projects:
+* [Chisel](https://github.com/freechipsproject/chisel3): Target-RTL that MIDAS transformed must is written in Chisel RTL. Additionally, MIDAS RTL libraries are all written in Chisel. 
+* [FIRRTL](https://github.com/freechipsproject/firrtl): Transformations of target-RTL are transformed using FIRRTL compiler passes.
+* [RocketChip](https://github.com/freechipsproject/rocket-chip.git): Rocket Chip is not only a chip generator, but also a collection of useful libraries for various hardware designs. 
+* [barstools](https://github.com/ucb-bar/barstools): Some additional technology-dependent custom transforms(e.g. macro compiler) are required when Strober energy modelling is enabled.
 
-Thie repo is not supposed to work alone. It is instantiated in top-level projects with target designs such as [strober-examples](https://github.com/donggyukim/strober-examples) and [midas-top](https://github.com/ucb-bar/midas-top.git).
+This repository is not standalone: it must be included in a top-level project with its dependencies and the source of the target design you wish to simulate. We provide two examples of this: [strober-examples](https://github.com/donggyukim/strober-examples), which applies MIDAS to a collection of more-simple Chisel designs, and [midas-top](https://github.com/ucb-bar/midas-top.git), which demonstrates how MIDAS may be used in a Rocket Chip-based SoC project.
 
-## Get Started
+## Getting Started
 
 ### MIDAS Compiler
 
@@ -193,3 +203,5 @@ The easiest way to write a testbench for the software driver is use `poke`, `pee
 First, implement a custom endpoint widget.
 
 Next, define `matchType` and `widget` in the inherited class of [`Endpoint`](src/main/scala/midas/core/Endpoints.scala). The `matchType` method finds the top-level I/O ports that the endpoint widget operates on. The `widget` method instantiates the endpoint widget.
+
+## MIDAS 
