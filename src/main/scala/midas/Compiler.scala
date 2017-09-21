@@ -1,21 +1,25 @@
 package midas
 
+import java.io.{File, FileWriter, Writer}
+
+import scala.collection.immutable.ListMap
+
 import freechips.rocketchip.config.Parameters
-import chisel3.{Data, Bundle}
+import chisel3.{Data, Bundle, Record}
 import firrtl.ir.Circuit
 import firrtl.CompilerUtils.getLoweringTransforms
 import firrtl.passes.memlib._
 import barstools.macros._
-import java.io.{File, FileWriter, Writer}
 
 // Compiler for Midas Transforms
-private class MidasCompiler(dir: File, io: Data)(implicit param: Parameters) extends firrtl.Compiler {
+private class MidasCompiler(dir: File, targetPorts: Record)(implicit param: Parameters) 
+    extends firrtl.Compiler {
   def emitter = new firrtl.LowFirrtlEmitter
   def transforms = getLoweringTransforms(firrtl.ChirrtlForm, firrtl.MidForm) ++ Seq(
     new InferReadWrite,
     new ReplSeqMem) ++
     getLoweringTransforms(firrtl.MidForm, firrtl.LowForm) ++ Seq(
-    new passes.MidasTransforms(dir, io))
+    new passes.MidasTransforms(dir, targetPorts))
 }
 
 // Compilers to emit proper verilog
@@ -25,10 +29,25 @@ private class VerilogCompiler extends firrtl.Compiler {
     new firrtl.LowFirrtlOptimization)
 }
 
+// A convenience class that populates a Record with a port list, returned by Module.getPorts 
+class TargetPortRecord(portList: Seq[chisel3.internal.firrtl.Port]) extends Record {
+  val elements = ListMap((for (port <- portList) yield {
+      (port.id.instanceName -> port.id.chiselCloneType)
+    }):_*)
+  override def cloneType = new TargetPortRecord(portList).asInstanceOf[this.type]
+}
+
+object TargetPortRecord {
+  def apply(mod: chisel3.experimental.RawModule) = new TargetPortRecord(mod.getPorts)
+}
+
 object MidasCompiler {
+  // Generates the verilog and memory map for a MIDAS simulation
+  // Accepts: An elaborated chisel circuit, record that mirrors its I/O,
+  // an output directory, and technology library
   def apply(
       chirrtl: Circuit,
-      io: Data,
+      targetPorts: Record,
       dir: File,
       lib: Option[File])
      (implicit p: Parameters): Circuit = {
@@ -40,12 +59,9 @@ object MidasCompiler {
       passes.MidasAnnotation(chirrtl.main, conf, json, lib),
       MacroCompilerAnnotation(chirrtl.main, MacroCompilerAnnotation.Params(
         json.toString, lib map (_.toString), CostMetric.default, true))))
-    // val writer = new FileWriter(new File("debug.ir"))
     val writer = new java.io.StringWriter
-    val midas = new MidasCompiler(dir, io) compile (
+    val midas = new MidasCompiler(dir, targetPorts) compile (
       firrtl.CircuitState(chirrtl, firrtl.ChirrtlForm, Some(annotations)), writer)
-    // writer.close
-    // firrtl.Parser.parse(writer.serialize)
     val verilog = new FileWriter(new File(dir, s"FPGATop.v"))
     val result = new VerilogCompiler compile (
       firrtl.CircuitState(midas.circuit, firrtl.HighForm), verilog)
@@ -53,26 +69,14 @@ object MidasCompiler {
     result.circuit
   }
 
+  // Unlike above, elaborates the target locally, before constructing the target IO Record.
   def apply[T <: chisel3.experimental.RawModule](w: => T, dir: File, libFile: Option[File])
       (implicit p: Parameters): Circuit = {
     dir.mkdirs
     lazy val target = w
     val chirrtl = firrtl.Parser.parse(chisel3.Driver.emit(() => target))
-
-    class RCBundle extends Bundle {
-        val clock = target.getPorts(0).id.cloneType
-        val reset = target.getPorts(1).id.cloneType
-        // Skip Debug port
-        val mem_axi4 = target.getPorts(3).id.cloneType
-        val serial = target.getPorts(4).id.cloneType
-        val uart = target.getPorts(5).id.cloneType
-        val net = target.getPorts(6).id.cloneType
-        val bdev = target.getPorts(7).id.cloneType
-
-        override def cloneType = new RCBundle().asInstanceOf[this.type]
-    }
-
-    val rcbundle = new RCBundle
-    apply(chirrtl, rcbundle, dir, libFile)
+    val targetPorts = TargetPortRecord(target)
+    apply(chirrtl, targetPorts, dir, libFile)
   }
 }
+

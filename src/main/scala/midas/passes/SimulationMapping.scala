@@ -1,7 +1,9 @@
 package midas
 package passes
 
-import midas.core.SimWrapper
+import java.io.{File, FileWriter, StringWriter}
+
+import chisel3.{Record}
 import firrtl._
 import firrtl.ir._
 import firrtl.Mappers._
@@ -9,10 +11,11 @@ import firrtl.Utils.BoolType
 import firrtl.passes.LowerTypes.loweredName
 import firrtl.Utils.{splitRef, mergeRef, create_exps, gender, module_type}
 import Utils._
-import java.io.{File, FileWriter, StringWriter}
+
+import midas.core.{SimWrapper}
 
 private[passes] class SimulationMapping(
-    io: chisel3.Data)
+    targetPorts: Record)
    (implicit param: freechips.rocketchip.config.Parameters) extends firrtl.passes.Pass {
   
   override def name = "[midas] Simulation Mapping"
@@ -46,8 +49,15 @@ private[passes] class SimulationMapping(
     case m: ExtModule => None
   }
 
+  // Performs simulation mapping. Here, we:
+  //
+  // 1) In a seperate chisel circuit, generate the token queues on the ports of the target design
+  // and bind them to the ports of a black box (TargetBox) with the same IO as the transfomed target
+  //
+  // 2) Link the transformed target with this simulation wrapper, by combining their firrtl 
+  // circuits and replacing instances of TargetBox with the real target
   def run(c: Circuit) = {
-    lazy val sim = new SimWrapper(io)
+    lazy val sim = new SimWrapper(targetPorts)
     val chirrtl = Parser parse (chisel3.Driver emit (() => sim))
     val annotations = new AnnotationMap(Nil)
     val writer = new StringWriter

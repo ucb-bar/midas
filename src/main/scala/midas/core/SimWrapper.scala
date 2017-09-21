@@ -1,6 +1,9 @@
 package midas
 package core
 
+import scala.collection.immutable.ListMap
+import scala.collection.mutable.{ArrayBuffer, HashSet}
+
 // from rocketchip
 import junctions.NastiIO
 import freechips.rocketchip.amba.axi4.AXI4Bundle
@@ -8,18 +11,17 @@ import freechips.rocketchip.config.{Parameters, Field}
 import freechips.rocketchip.util.HeterogeneousBag
 
 import chisel3._
+import chisel3.internal.firrtl.Port
 import chisel3.util._
 import chisel3.experimental._
 import SimUtils._
-import scala.collection.immutable.ListMap
-import scala.collection.mutable.{ArrayBuffer, HashSet}
 
 object SimUtils {
   def parsePorts(io: Data, reset: Option[Bool] = None, prefix: String = "io") = {
     val inputs = ArrayBuffer[(Data, String)]()
     val outputs = ArrayBuffer[(Data, String)]()
     def loop(name: String, data: Data): Unit = data match {
-      case b: Bundle =>
+      case b: Record =>
         b.elements foreach {case (n, e) => loop(s"${name}_${n}", e)}
       case v: Vec[_] =>
         v.zipWithIndex foreach {case (e, i) => loop(s"${name}_${i}", e)}
@@ -89,7 +91,7 @@ class SimWrapperIO(
       case Some(endpoint) =>
         endpoint add (name, data)
       case None => data match {
-        case b: Bundle => b.elements foreach {
+        case b: Record => b.elements foreach {
           case (n, e) => findEndpoint(s"${name}_${n}", e)
         }
         case v: Vec[_] => v.zipWithIndex foreach {
@@ -171,44 +173,24 @@ class SimWrapperIO(
 }
 
 
-// this gets replaced with the real target
-class TargetBox(targetIo: Data) extends ExtModule {
-  val origtop = targetIo.cloneType.asInstanceOf[Bundle]
 
-  val mem_axi4 = IO(origtop.elements("mem_axi4").cloneType)
-  val serial = IO(origtop.elements("serial").cloneType)
-  val uart = IO(origtop.elements("uart").cloneType)
-  val net = IO(origtop.elements("net").cloneType)
-  val bdev = IO(origtop.elements("bdev").cloneType)
-  val clock = IO(Input(Clock()))
-  val reset = IO(Input(Bool()))
+// this gets replaced with the real target
+class TargetBox(targetIo: Record) extends BlackBox {
+  val io = IO(targetIo.cloneType)
 }
 
 // this converts from the top-level IO that the rest of midas expects to the
 // single-io-less new rocketchip
-class TargetBoxBundleWrap(targetIo: Data) extends Module {
-  val origtop = targetIo.cloneType.asInstanceOf[Bundle]
+class TargetBoxBundleWrap(targetIo: Record) extends Module {
   val io = IO(new Bundle {
     val clock = Input(Clock())
     val reset = Input(Bool())
     val fire = Input(Bool())
-
-    val io = new Bundle {
-      val mem_axi4 = origtop.elements("mem_axi4").cloneType
-      val serial = origtop.elements("serial").cloneType
-      val uart = origtop.elements("uart").cloneType
-      val net = origtop.elements("net").cloneType
-      val bdev = origtop.elements("bdev").cloneType
-    }
+    val io = targetIo.cloneType
   })
+
   val target = Module(new TargetBox(targetIo))
-  target.clock := io.clock
-  target.reset := io.reset
-  io.io.mem_axi4 <> target.mem_axi4
-  io.io.serial <> target.serial
-  io.io.uart <> target.uart
-  io.io.net <> target.net
-  io.io.bdev <> target.bdev
+  io.io <> target.io
 }
 
 class SimBox(simIo: SimWrapperIO)
@@ -221,7 +203,7 @@ class SimBox(simIo: SimWrapperIO)
   })
 }
 
-class SimWrapper(targetIo: Data)
+class SimWrapper(targetIo: Record)
                 (implicit val p: Parameters) extends Module with HasSimWrapperParams {
   val target = Module(new TargetBoxBundleWrap(targetIo))
   val io = IO(new SimWrapperIO(target.io.io, target.io.reset))

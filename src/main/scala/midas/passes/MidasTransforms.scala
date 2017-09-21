@@ -1,17 +1,16 @@
 package midas
 package passes
 
-import midas.core._
+import java.io.{File, FileWriter}
 
+import chisel3.Record
 import chisel3.experimental.ChiselAnnotation
-
 import firrtl._
 import firrtl.annotations._
 import firrtl.ir._
 import firrtl.Mappers._
 import firrtl.transforms.{DedupModules, DeadCodeElimination}
-import Utils._
-import java.io.{File, FileWriter}
+import midas.core._
 
 private class WCircuit(
   info: Info,
@@ -34,7 +33,7 @@ object MidasAnnotation {
 
 private[midas] class MidasTransforms(
     dir: File,
-    io: chisel3.Data)
+    targetPorts: Record)
     (implicit param: freechips.rocketchip.config.Parameters) extends Transform {
   def inputForm = LowForm
   def outputForm = LowForm
@@ -52,7 +51,7 @@ private[midas] class MidasTransforms(
         firrtl.passes.RemoveEmpty,
         new Fame1Transform(Some(lib getOrElse json)),
         new strober.passes.StroberTransforms(dir, lib getOrElse json),
-        new SimulationMapping(io),
+        new SimulationMapping(targetPorts),
         new PlatformMapping(state.circuit.main, dir))
       (xforms foldLeft state)((in, xform) =>
         xform runTransform in).copy(form=outputForm)
