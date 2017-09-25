@@ -63,7 +63,7 @@ $(endpoint_o): $(GEN_DIR)/%.o: $(endpoint_dir)/%.cc $(GEN_DIR)/$(DESIGN)-const.h
 
 addon_files := sample/simif_sample debug/simif_debug
 platform_files := simif simif_$(PLATFORM) sample/sample
-platform_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(platform_files)))
+platform_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(platform_files) debug/print.h))
 platform_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(platform_files) $(addon_files)))
 platform_o := $(addprefix $(GEN_DIR)/, $(addsuffix .o, $(platform_files) $(addon_files)))
 

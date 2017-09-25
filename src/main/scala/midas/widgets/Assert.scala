@@ -57,6 +57,10 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
                           queue.io.enq.valid || fire && io.tReset.bits)
     val readyReg = RegInit(false.B)
     val validReg = RegNext(queue.io.deq.valid)
+    queue suggestName s"queue_${i}"
+    stamp suggestName s"stamp_${i}"
+    when(false.B) { printf("%d", queue.io.count) }
+    when(false.B) { printf("%d", stamp.io.count) }
     queue.io.enq.bits  := elem >> 1.U
     queue.io.enq.valid := elem(0) && fire && !io.tReset.bits && enable
     stamp.io.enq.bits  := cycles - last

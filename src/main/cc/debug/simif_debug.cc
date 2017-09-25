@@ -33,47 +33,32 @@ void simif_t::detect_assert() {
 #endif // ENABLE_DEBUG
 
 #ifdef ENABLE_PRINT
-void simif_t::print_format(size_t i, mpz_t& bits) {
-  const char* fmt = print_formats[i].c_str();
-  size_t k = 0, off = 0;
+void print_format(const char* fmt, print_vars_t* vars) {
+  size_t k = 0;
   while(*fmt) {
     if (*fmt == '%' && fmt[1] != '%') {
-      size_t width = print_widths[i][k];
-      mpz_t value, mask;
-      mpz_init(value);
-      mpz_init(mask);
-      // value = bits >> off
-      mpz_fdiv_q_2exp(value, bits, off);
-      // mask = (1 << width) - 1
-      mpz_set_ui(mask, 1);
-      mpz_mul_2exp(mask, mask, width);
-      mpz_sub_ui(mask, mask, 1);
-      // value = value & mask
-      mpz_and(value, value, mask);
+      mpz_t* value = vars->data[k];
       char* v = NULL;
       if (fmt[1] == 's') {
         // Is order right?
         size_t size;
-        v = (char*)mpz_export(NULL, &size, 1, sizeof(char), 0, 0, value);
+        v = (char*)mpz_export(NULL, &size, 1, sizeof(char), 0, 0, *value);
         for (size_t j = 0 ; j < size ; j++) fputc(v[j], stderr);
         fmt++;
       } else {
         switch(*(++fmt)) {
           // TODO: exhaustive?
           case 'h':
-          case 'x': v = mpz_get_str(NULL, 16, value); break;
-          case 'd': v = mpz_get_str(NULL, 10, value); break;
-          case 'b': v = mpz_get_str(NULL, 2, value); break;
+          case 'x': v = mpz_get_str(NULL, 16, *value); break;
+          case 'd': v = mpz_get_str(NULL, 10, *value); break;
+          case 'b': v = mpz_get_str(NULL, 2, *value); break;
           default: break;
         }
         if (v) fprintf(stderr, "%s", v);
       }
       free(v);
-      mpz_clear(value);
-      mpz_clear(mask);
       fmt++;
       k++;
-      off += width;
     } else if (*fmt == '%') {
       fputc(*(++fmt), stderr);
       fmt++;
@@ -85,97 +70,142 @@ void simif_t::print_format(size_t i, mpz_t& bits) {
       fmt++;
     }
   }
+  assert(k == vars->size);
 }
 
-bool simif_t::detect_prints() {
-  bool detected = false;
+int simif_t::select_print() {
   for (size_t i = 0 ; i < PRINTS_NUM ; i++) {
-    if (print_stamps[i] == 0 && read(PRINTS_VALID_ADDRS[i])) {
-      print_stamps[i] = read(PRINTS_STAMP_ADDRS[i]);
+    if (print_state.stamps[i] == 0 && read(PRINTS_VALID_ADDRS[i])) {
+      print_state.stamps[i] = read(PRINTS_STAMP_ADDRS[i]);
     }
   }
 
-  size_t sel;
   uint64_t min = -1L;
-  for (size_t i = 0 ; i < PRINTS_NUM ; i++) {
-    if (print_stamps[i] > 0) {
-      uint64_t cycle = print_cycles[i] + print_stamps[i];
+  print_state.select = -1;
+  for (int i = 0 ; i < PRINTS_NUM ; i++) {
+    if (print_state.stamps[i] > 0) {
+      uint64_t cycle = print_state.cycles[i] + print_state.stamps[i];
       if (min > cycle) {
         min = cycle;
-        sel = i;
+        print_state.select = i;
       }
     }
   }
-
-  if (min < (uint64_t)(-1L)) {
-    size_t chunk = PRINTS_BITS_CHUNKS[sel];
-    data_t* data = new data_t[chunk];
-    for (size_t k = 0 ; k < chunk ; k ++) {
-      data[k] = read(PRINTS_BITS_ADDRS[sel] + k);
-    }
-    mpz_t bits;
-    mpz_init(bits);
-    mpz_import(bits, chunk, -1 , sizeof(data_t), 0, 0, data);
-    // std::cerr << "[C: " << min << " sel: " << sel << " ] ";
-    print_format(sel, bits);
-    delete[] data;
-    mpz_clear(bits);
-    write(PRINTS_READY_ADDRS[sel], 1);
-    print_cycles[sel] = min;
-    print_stamps[sel] = 0;
-    detected = true;
+  if (print_state.select >= 0) {
+    print_state.cycles[print_state.select] = min;
+    print_state.stamps[print_state.select] = 0;
   }
 
-  return detected;
+  return print_state.select;
+}
+
+void simif_t::read_print_vars() {
+  int sel = print_state.select;
+  assert(sel >= 0 && sel < PRINTS_NUM);
+  size_t chunk = PRINTS_BITS_CHUNKS[sel];
+  data_t* data = new data_t[chunk];
+  for (size_t k = 0 ; k < chunk ; k ++) {
+    data[k] = read(PRINTS_BITS_ADDRS[sel] + k);
+  }
+  mpz_t bits;
+  mpz_init(bits);
+  mpz_import(bits, chunk, -1 , sizeof(data_t), 0, 0, data);
+  delete[] data;
+
+  size_t off = 0;
+  for (size_t k = 0 ; k < print_state.widths[sel].size() ; k++) {
+    mpz_t* var = print_state.vars[sel]->data[k];
+    mpz_t* mask = print_state.masks[sel]->data[k];
+    // *var = bits >> off
+    mpz_fdiv_q_2exp(*var, bits, off);
+    // *var = *var & *mask
+    mpz_and(*var, *var, *mask);
+    off += print_state.widths[sel][k];
+  }
+}
+
+void simif_t::clear_print_vars() {
+  write(PRINTS_READY_ADDRS[print_state.select], 1);
+}
+
+bool simif_t::detect_prints() {
+  int sel = select_print();
+
+  if (sel >= 0) {
+    read_print_vars();
+    // std::cerr << "[C: " << print_state.cycle[sel] << "]";
+    print_format(print_state.formats[sel].c_str(), print_state.vars[sel]);
+    clear_print_vars();
+  } 
+
+  return sel >= 0;
 }
 
 void simif_t::init_prints(int argc, char** argv) {
   std::vector<std::string> args(argv + 1, argv + argc);
-  enable_prints = false;
+  print_state.enable = false;
   for (auto &arg: args) {
     if (arg.find("+prints") == 0) {
-      enable_prints = true;
+      print_state.enable = true;
     }
   }
-  write(PRINTS_ENABLE, enable_prints);
+  write(PRINTS_ENABLE, print_state.enable);
   std::string filename = std::string(TARGET_NAME) + ".prints";
   std::ifstream file(filename.c_str());
   if (!file) {
     fprintf(stderr, "Cannot open %s\n", filename.c_str());
-    if (enable_prints) exit(EXIT_FAILURE);
+    if (print_state.enable) exit(EXIT_FAILURE);
     else return;
   }
 
-  std::fill(print_names.begin(), print_names.end(), std::vector<std::string>());
-  std::fill(print_widths.begin(), print_widths.end(), std::vector<size_t>());
-  std::fill(print_cycles.begin(), print_cycles.end(), 0L);
-  std::fill(print_stamps.begin(), print_stamps.end(), 0);
+  std::fill(print_state.names.begin(), print_state.names.end(), std::vector<std::string>());
+  std::fill(print_state.widths.begin(), print_state.widths.end(), std::vector<size_t>());
+  std::fill(print_state.cycles.begin(), print_state.cycles.end(), 0L);
+  std::fill(print_state.stamps.begin(), print_state.stamps.end(), 0);
   std::string line;
   size_t i = 0;
-  bool is_format = true;
+  enum { PRINT_FMT, PRINT_ARGS } line_state = PRINT_FMT;
   while (std::getline(file, line)) {
-    if (is_format) {
-      print_formats[i] = line;
-      is_format = false;
-    } else {
-      std::istringstream iss(line);
-      std::string token;
-      bool is_name = true;
-      while (std::getline(iss, token, ' ')) {
-        if (is_name) {
-          print_names[i].push_back(token);
-          is_name = false;
-        } else {
-          print_widths[i].push_back((size_t)atol(token.c_str()));
-          is_name = true;
+    switch (line_state) {
+      case PRINT_FMT:
+        print_state.formats[i] = line;
+        line_state = PRINT_ARGS;
+        break;
+      case PRINT_ARGS:
+        std::istringstream iss(line);
+        std::string token;
+        enum { PRINT_NAME, PRINT_VAR } token_state = PRINT_NAME;
+        while (std::getline(iss, token, ' ')) {
+          switch (token_state) {
+            case PRINT_NAME:
+              print_state.names[i].push_back(token);
+              token_state = PRINT_VAR;
+              break;
+            case PRINT_VAR:
+              print_state.widths[i].push_back((size_t)atol(token.c_str()));
+              token_state = PRINT_NAME;
+              break;
+          }
         }
-      }
-      assert(is_name);
-      is_format = true;
-      i++;
+        assert(token_state == PRINT_NAME);
+        size_t size = print_state.widths[i].size();
+        assert(size == print_state.names[i].size());
+        print_state.vars[i] = new print_vars_t(size);
+        print_state.masks[i] = new print_vars_t(size);
+        for (size_t k = 0 ; k < size ; k++) {
+           mpz_t* mask = print_state.masks[i]->data[k];
+           size_t width = print_state.widths[i][k];
+           // *mask = (1 << width) - 1
+           mpz_set_ui(*mask, 1);
+           mpz_mul_2exp(*mask, *mask, width);
+           mpz_sub_ui(*mask, *mask, 1);
+        }
+        i++;
+        line_state = PRINT_FMT;
+        break;
     }
   }
-  assert(is_format);
+  assert(line_state == PRINT_FMT);
   assert(i == PRINTS_NUM);
 }
 #endif // ENABLE_PRINT

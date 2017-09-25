@@ -10,6 +10,9 @@
 #ifdef ENABLE_SNAPSHOT
 #include "sample/sample.h"
 #endif
+#ifdef ENABLE_PRINT
+#include "debug/print.h"
+#endif
 #include <gmp.h>
 #include <sys/time.h>
 #define TIME_DIV_CONST 1000000.0;
@@ -50,17 +53,15 @@ class simif_t
 #endif
 #ifdef ENABLE_PRINT
   public:
-    void print_format(size_t i, mpz_t& bit);
+    print_state_t* get_print_state() { return &print_state; }
+    int select_print();
+    void read_print_vars();
+    void clear_print_vars();
 
   private:
     bool detect_prints();
     void init_prints(int argc, char** argv);
-    bool enable_prints;
-    std::array<std::string,              PRINTS_NUM> print_formats;
-    std::array<std::vector<std::string>, PRINTS_NUM> print_names;
-    std::array<std::vector<size_t>,      PRINTS_NUM> print_widths;
-    std::array<uint64_t,                 PRINTS_NUM> print_cycles;
-    std::array<data_t,                   PRINTS_NUM> print_stamps;
+    print_state_t print_state;
 #endif
 
   public:
@@ -73,7 +74,7 @@ class simif_t
       detect_assert();
 #endif
 #ifdef ENABLE_PRINT
-      while(enable_prints && detect_prints());
+      while(print_state.enable && detect_prints());
 #endif
       return read(MASTER(DONE));
     }

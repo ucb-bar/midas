@@ -281,7 +281,7 @@ class SimWrapper(targetIo: Data)
   val assertChannel = Wire(io.assert)
   if (numAsserts > 0) {
     io.assert <> Queue(assertChannel, p(ChannelLen))
-    assertChannel.bits := Cat(PriorityEncoder(asserts), asserts.orR)
+    assertChannel.bits := Cat(PriorityEncoder(asserts), asserts.orR && !target.io.reset)
   } else {
     assertChannel.ready := true.B
   }
