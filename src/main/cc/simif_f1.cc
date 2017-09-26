@@ -7,6 +7,13 @@
 #include <unistd.h>
 
 simif_f1_t::simif_f1_t(int argc, char** argv) {
+#ifdef SIMULATION_XSIM
+    mkfifo(driver_to_xsim, 0666);
+    fprintf(stderr, "opening driver to xsim\n");
+    driver_to_xsim_fd = open(driver_to_xsim, O_WRONLY);
+    fprintf(stderr, "opening xsim to driver\n");
+    xsim_to_driver_fd = open(xsim_to_driver, O_RDONLY);
+#else
     slot_id = -1;
     std::vector<std::string> args(argv + 1, argv + argc);
     for (auto &arg: args) {
@@ -18,14 +25,6 @@ simif_f1_t::simif_f1_t(int argc, char** argv) {
         fprintf(stderr, "Slot ID not specified. Assuming Slot 0\n");
         slot_id = 0;
     }
-
-#ifdef SIMULATION_XSIM
-    mkfifo(driver_to_xsim, 0666);
-    fprintf(stderr, "opening driver to xsim\n");
-    driver_to_xsim_fd = open(driver_to_xsim, O_WRONLY);
-    fprintf(stderr, "opening xsim to driver\n");
-    xsim_to_driver_fd = open(xsim_to_driver, O_RDONLY);
-#else
     fpga_setup();
 #endif
 }
