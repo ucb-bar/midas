@@ -233,7 +233,7 @@ def genWORegInit[T <: Data](wire: T, name: String, default: T): T
 def genROReg[T <: Data](wire: T, name: String): T
 def genRORegInit[T <: Data](wire: T, name: String, default: T): T
 ```
-`name`s are used to generate macros for memory-mapped registers. Note that the maximum width of each communication is platform-dependent (given as `io.ctrl.nastiXDataBits`), so each word should be chopped and sent if it exceeds the max width. Also, the APIs are not finialized yet, so they are subject to change in later releases. Finally, don't forget to call `genCRFile()` at the end, which elaborates all assigned control registers.
+`name` is used to generate macros for memory-mapped registers. Note that the maximum width of each communication is platform-dependent (given as `io.ctrl.nastiXDataBits`), so each word should be chopped and sent if it exceeds the max width. Finally, don't forget to call `genCRFile()` at the end, which elaborates all assigned control registers. The APIs are not finialized yet, so they are subject to change in later releases.
 
 #### Custom Endpoint Widget Instantiation
 
@@ -259,7 +259,7 @@ To write endpoint software, implement a derived class of [`endpoint_t`](https://
 
 Therefore, in the software driver, non-blocking `n` steps are taken with `step(n, false)`, and `tick` functions of all endpoints are called until they are `done`.
 
-`tick` and `done` are implemented using `read` and `write` functions for memory-mapped registers. Once custom endpoints are instantiated, macros for memory mapped registers are generated in `<Design>-const.h`. If you implemented an endpoint widget `FooWidget` and generated a memory mapped reigster with `name` being `"bar"`, this register can be read and written with `read(FOOWIDGET_0(bar))` and `write(FOOWIDGET_0(bar), ...)`, respectively. 
+`tick` and `done` are implemented using `read` and `write` functions for memory-mapped registers. Once custom endpoints are instantiated, macros for memory mapped registers are generated in `<Design>-const.h`. If you implemented an endpoint widget `FooWidget` and generated a memory mapped reigster with `name` being `"bar"`, this register can be read and written with `read(FOOWIDGET_0(bar))` and `write(FOOWIDGET_0(bar), ...)`, respectively.
 
 ### Porting to Other FPGA Platforms
 
