@@ -185,7 +185,7 @@ The variables, mostly shared with the simulator driver compilations, are:
 * `DESIGN`: Target design name
 * `GEN_DIR`: The directory containing generated files from replay Compiler (=`dir`)
 * `OUT_DIR`: The directory for output files (`GEN_DIR` by default)
-* `TARGET_VERILOG`: The verilog file for replays (verilog files from `strober.replay.Compiler` by default). This variable should be overriden if the gate-level designs from CAD tools are used.
+* `TARGET_VERILOG`: The Verilog file for replays (Verilog files from `strober.replay.Compiler` by default). This variable should be overriden if the gate-level designs from CAD tools are used.
 * `REPLAY_BINARY`: The simulator binary path equal to the makefile target (=`<simulator binary path>`) (`$(OUT_DIR)/$(DESIGN)-replay` by default)
 
 Finally, run the following command to replay samples:
