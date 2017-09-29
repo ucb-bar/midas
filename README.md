@@ -26,7 +26,7 @@ This repository is not standalone: it must be included in a top-level project wi
 
 ### MIDAS Compiler
 
-First of all, we assume the target design is written in Chisel. To generate the FPGA simulator for the target design, just pass the target design with a configuration to `MidasCompiler`:
+First of all, we assume the target design is written in Chisel. To generate the FPGA simulator for the target design, just pass the target design with a configuration to `midas.MidasCompiler`:
 ```scala
 // mod: Module (target design)
 // dir: File (target directory)
@@ -120,7 +120,7 @@ In this way, we can reduce lots of code duplication for emulation and various pl
 
 Big numbers more than 64 bits can be declared with `mpz_t` in [GMP](https://gmplib.org/), and passed to `peek`, `poke`, `expect` functions.
 
-To compile the driver, `make` is invoked in `src/main/cc`. Thus, the top-level makefile is likely to contain the wrapper as follows:
+To compile the driver, `make` is invoked in [src/main/cc](src/main/cc). Thus, the top-level makefile is likely to contain the wrapper as follows:
 ```makefile
 compile-driver:
   $(MAKE) -C $(midas_dir)/src/main/cc [verilator | vcs | zynq] [variable="<value>"]*
@@ -131,7 +131,7 @@ The variables are:
 * `DESIGN`: Target design name
 * `GEN_DIR`: The directory containing generated files from MIDAS Compiler (=`dir`)
 * `OUT_DIR`: The directory for output files (`GEN_DIR` by default)
-* `DRIVER`: The driver files written by the user (not including header files)
+* `DRIVER`: The c++ driver files written by the user (not including header files)
 * `CXXFLAGS`: additional compiler flags
 
 ### FPGA Simulation Synthesis
@@ -160,6 +160,48 @@ The argument list is as follows:
 * `+tracelen=`: the length of I/O traces (strober only)
 
 Note that MIDAS emulation and FPGA simulation share most command-line arguments.
+
+### Replay Samples
+
+If you enabled Strober enery modeling, the file containing random RTL sample snapshots will be generated at the end of the simulation run. The snapshots will be replayed in RTL/gate-level simulation for power estimation.
+
+First compile the target design using [`strober.replay.Compiler`](src/main/scala/strober/replay/Compiler.scala):
+```scala
+// mod: Module (target design)
+// dir: File (target directory)
+// lib: File (technology description)
+strober.replay.Compiler(mod, dir, Some(lib))
+```
+This makes sure the RTL for FPGA simulation and sample replays are the same. Run CAD tools (we recommend using [HAMMER](https://github.com/ucb-bar/hammer)) using the generated Verilog file.
+
+The RTL/gate-level simulators are also compiled in [src/main/cc](src/main/cc):
+```makefile
+compile-replay:
+  $(MAKE) -C $(midas_dir)/src/main/cc <simulator binary path> [variable="<value>"]*
+```
+
+The variables, mostly shared with the simulator driver compilations, are:
+* `PLATFORM`: Platform name (zynq by default)
+* `DESIGN`: Target design name
+* `GEN_DIR`: The directory containing generated files from replay Compiler (=`dir`)
+* `OUT_DIR`: The directory for output files (`GEN_DIR` by default)
+* `TARGET_VERILOG`: The verilog file for replays (verilog files from `strober.replay.Compiler` by default). This variable should be overriden if the gate-level designs from CAD tools are used.
+* `REPLAY_BINARY`: The simulator binary path equal to the makefile target (=`<simulator binary path>`) (`$(OUT_DIR)/$(DESIGN)-replay` by default)
+
+Finally, run the following command to replay samples:
+```
+cd $(OUT_DIR)
+./<simulator-binary> +sample=<sample file> [+verbose] [+match=<match file>] [+waveform=<vpd file path>] [+vcdfile=<vcd file path>]
+```
+Note that `+match=<match file path>` is necessary for gate-level simulation to find the state mapping between RTL and gate-level as explained in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
+
+MIDAS also contains useful scripts for sample replays in [src/main/resources/replay](src/main/resources/replay):
+* [fm-match.py](src/main/resources/replay/fm-match.py): generates the match file for sample replays from Synopsys Formality report files and SVF files.
+* [fm-macro.py](src/main/resources/replay/fm-macro.py): finds the state mapping for SRAMs
+* [replay-samples.py](src/main/resources/replay/replay-samples.py): split samples and replay each sample in a separate simulation instance.
+* [estimate-power.py](src/main/resources/replay/estimate-power.py): compute and aggregate power estimates of each sample using [HAMMER](https://github.com/ucb-bar/hammer).
+
+For details, run `./<script> -h`.
 
 ### Templates / Examples
 
