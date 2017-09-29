@@ -17,25 +17,25 @@ import chisel3.experimental._
 import SimUtils._
 
 object SimUtils {
-  def parsePorts(io: Data, reset: Option[Bool] = None, prefix: String = "io") = {
-    val inputs = ArrayBuffer[(Data, String)]()
-    val outputs = ArrayBuffer[(Data, String)]()
+  def parsePorts(io: Data, reset: Option[Bool] = None, prefix: String = "") = {
+    val inputs = ArrayBuffer[(Bits, String)]()
+    val outputs = ArrayBuffer[(Bits, String)]()
+
+    def prefixWith(prefix: String, base: Any): String  = if (prefix != "")  s"${prefix}_${base}" else base.toString
+
     def loop(name: String, data: Data): Unit = data match {
       case b: Record =>
-        b.elements foreach {case (n, e) => loop(s"${name}_${n}", e)}
+        b.elements foreach {case (n, e) => loop(prefixWith(name, n), e)}
       case v: Vec[_] =>
-        v.zipWithIndex foreach {case (e, i) => loop(s"${name}_${i}", e)}
+        v.zipWithIndex foreach {case (e, i) => loop(prefixWith(name, i), e)}
       case b: Bits if b.dir == INPUT => inputs += (b -> name)
       case b: Bits if b.dir == OUTPUT => outputs += (b -> name)
-      case b: Clock if b.dir == INPUT => inputs += (b -> name)
+      case b: Clock if b.dir == INPUT => Nil
       //case b: Clock if b.dir == OUTPUT => outputs += (b.asUInt -> name)
-      case default => 
-        default.asInstanceOf[HeterogeneousBag[AXI4Bundle]].elements foreach {case (n, e) => loop(s"${name}_${n}", e)}
+      case default =>
+        default.asInstanceOf[HeterogeneousBag[AXI4Bundle]].elements foreach {case (n, e) => loop(prefixWith(name, n), e)}
     }
-    reset match {
-      case None =>
-      case Some(r) => inputs += (r -> "reset")
-    }
+
     loop(prefix, io)
     (inputs.toList, outputs.toList)
   }
@@ -81,7 +81,7 @@ class ReadyValidTraceRecord(es: Seq[(String, ReadyValidIO[Data])]) extends Recor
 }
 
 class SimWrapperIO(
-    io: Data, reset: Bool)
+    io: Record, reset: Bool)
    (implicit val p: Parameters) extends Bundle with HasSimWrapperParams {
   /*** Endpoints ***/
   val endpointMap = p(EndpointKey)
@@ -104,7 +104,7 @@ class SimWrapperIO(
       }
     }
   }
-  findEndpoint("io", io)
+  io.elements.foreach({ case (name, data) => findEndpoint(name, data)})
 
   val (inputs, outputs) = parsePorts(io, Some(reset))
 
@@ -114,7 +114,7 @@ class SimWrapperIO(
     data.elements.toSeq flatMap {
       case (name, rv: ReadyValidIO[_]) => Nil
       case (name, wires) =>
-        val (ins, outs) = SimUtils.parsePorts(wires)
+        val (ins, outs) = parsePorts(wires, prefix = "io")
         (ins ++ outs).unzip._1
     }
   })).toSet
@@ -172,25 +172,19 @@ class SimWrapperIO(
     new SimWrapperIO(io, reset).asInstanceOf[this.type]
 }
 
+class RecordWithClockAndReset(targetIo: Record) extends Record {
+  val clock = Input(Clock())
+  val reset = Input(Bool())
+  val elements = ListMap(((for ((field, elm) <- targetIo.elements) yield {
+      (field -> elm.chiselCloneType)
+    }).toSeq ++ Seq("clock" -> clock, "reset" -> reset)):_*)
 
+  override def cloneType = new RecordWithClockAndReset(targetIo).asInstanceOf[this.type]
+}
 
 // this gets replaced with the real target
 class TargetBox(targetIo: Record) extends BlackBox {
-  val io = IO(targetIo.cloneType)
-}
-
-// this converts from the top-level IO that the rest of midas expects to the
-// single-io-less new rocketchip
-class TargetBoxBundleWrap(targetIo: Record) extends Module {
-  val io = IO(new Bundle {
-    val clock = Input(Clock())
-    val reset = Input(Bool())
-    val fire = Input(Bool())
-    val io = targetIo.cloneType
-  })
-
-  val target = Module(new TargetBox(targetIo))
-  io.io <> target.io
+  val io = IO(new RecordWithClockAndReset(targetIo))
 }
 
 class SimBox(simIo: SimWrapperIO)
@@ -205,10 +199,10 @@ class SimBox(simIo: SimWrapperIO)
 
 class SimWrapper(targetIo: Record)
                 (implicit val p: Parameters) extends Module with HasSimWrapperParams {
-  val target = Module(new TargetBoxBundleWrap(targetIo))
-  val io = IO(new SimWrapperIO(target.io.io, target.io.reset))
+  val target = Module(new TargetBox(targetIo))
+  val io = IO(new SimWrapperIO(target.io, target.io.reset))
   val fire = Wire(Bool())
-  target.io.fire := fire
+
   target.io.clock := clock
 
   /*** Wire Channels ***/
