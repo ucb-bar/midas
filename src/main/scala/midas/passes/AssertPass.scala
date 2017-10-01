@@ -47,7 +47,7 @@ private[passes] class AssertPass(
             EmptyStmt
           case _ => s
         }
-      case s: Print if param(EnablePrint) && s.args.nonEmpty =>
+      case s: Print if param(EnablePrint) && s.args.nonEmpty && !(mname contains "UART") =>
         prints(mname) += s
         EmptyStmt
       case s => s
