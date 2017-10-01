@@ -55,11 +55,11 @@ class simif_t
   public:
     print_state_t* get_print_state() { return &print_state; }
     int select_print();
-    void read_print_vars();
     void clear_print_vars();
 
   private:
     bool detect_prints();
+    void read_print_vars(size_t id);
     void init_prints(int argc, char** argv);
     print_state_t print_state;
 #endif

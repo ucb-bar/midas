@@ -48,23 +48,24 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
   val readyAddrs = collection.mutable.ArrayBuffer[Int]()
   val bitsAddrs = collection.mutable.ArrayBuffer[Int]()
   val bitsChunks = collection.mutable.ArrayBuffer[Int]()
-  val stampAddrs = collection.mutable.ArrayBuffer[Int]()
+  val deltaAddrs = collection.mutable.ArrayBuffer[Int]()
   val prints = io.prints.bits.elements.zipWithIndex map { case ((_, elem), i) =>
     val width = elem.getWidth - 1
-    val queue = Module(new Queue(UInt(width.W), p(strober.core.TraceMaxLen)))
-    val stamp = Module(new Queue(UInt(24.W),    p(strober.core.TraceMaxLen))) // TODO: to big?
+    val queue = Module(new Queue(UInt(width.W), p(strober.core.TraceMaxLen), flow=true))
+    // FIXME: too big?
+    val delta = Module(new Queue(UInt(32.W),    p(strober.core.TraceMaxLen), flow=true))
     val last  = RegEnable(Mux(io.tReset.bits, 0.U, cycles),
                           queue.io.enq.valid || fire && io.tReset.bits)
     val readyReg = RegInit(false.B)
     val validReg = RegNext(queue.io.deq.valid)
     queue suggestName s"queue_${i}"
-    stamp suggestName s"stamp_${i}"
+    delta suggestName s"delta_${i}"
     when(false.B) { printf("%d", queue.io.count) }
-    when(false.B) { printf("%d", stamp.io.count) }
+    when(false.B) { printf("%d", delta.io.count) }
     queue.io.enq.bits  := elem >> 1.U
     queue.io.enq.valid := elem(0) && fire && !io.tReset.bits && enable
-    stamp.io.enq.bits  := cycles - last
-    stamp.io.enq.valid := queue.io.enq.valid
+    delta.io.enq.bits  := cycles - last
+    delta.io.enq.valid := queue.io.enq.valid
     readyAddrs += attach(readyReg, s"prints_${i}_ready", WriteOnly)
     validAddrs += attach(validReg, s"prints_${i}_valid", ReadOnly)
     val bits = (0 until width by io.ctrl.nastiXDataBits).zipWithIndex map { case (low, j) =>
@@ -74,10 +75,10 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
     }
     bitsAddrs += bits.head
     bitsChunks += bits.size
-    stampAddrs += attachDecoupledSource(stamp.io.deq, s"prints_${i}_stamp")
+    deltaAddrs += attachDecoupledSource(delta.io.deq, s"prints_${i}_delta")
     queue.io.deq.ready := readyReg
     Pulsify(readyReg, pulseLength = 1)
-    queue.io.enq.ready && stamp.io.enq.ready
+    queue.io.enq.ready && delta.io.enq.ready
   }
   fire := (prints foldLeft (io.prints.valid && io.tReset.valid))(_ && _)
   io.tReset.ready := fire
@@ -95,7 +96,7 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
     sb.append(genArray("PRINTS_VALID_ADDRS", validAddrs.toSeq map (x => UInt32(base + x))))
     sb.append(genArray("PRINTS_BITS_ADDRS", bitsAddrs.toSeq map (x => UInt32(base + x))))
     sb.append(genArray("PRINTS_BITS_CHUNKS", bitsChunks.toSeq map (UInt32(_))))
-    sb.append(genArray("PRINTS_STAMP_ADDRS", stampAddrs.toSeq map (x => UInt32(base + x))))
+    sb.append(genArray("PRINTS_DELTA_ADDRS", deltaAddrs.toSeq map (x => UInt32(base + x))))
   }
 
   genCRFile()

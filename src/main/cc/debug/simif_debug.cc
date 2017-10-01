@@ -74,17 +74,25 @@ void print_format(const char* fmt, print_vars_t* vars) {
 }
 
 int simif_t::select_print() {
-  for (size_t i = 0 ; i < PRINTS_NUM ; i++) {
-    if (print_state.stamps[i] == 0 && read(PRINTS_VALID_ADDRS[i])) {
-      print_state.stamps[i] = read(PRINTS_STAMP_ADDRS[i]);
+  const size_t bound = 1024;
+  bool done;
+  do {
+    done = true;
+    for (size_t i = 0 ; i < PRINTS_NUM ; i++) {
+      if (print_state.values.size() < bound && read(PRINTS_VALID_ADDRS[i])) {
+        read_print_vars(i);
+        print_state.deltas[i].push(read(PRINTS_DELTA_ADDRS[i]));
+        done = false;
+      }
     }
-  }
+  } while(!done);
 
   uint64_t min = -1L;
   print_state.select = -1;
   for (int i = 0 ; i < PRINTS_NUM ; i++) {
-    if (print_state.stamps[i] > 0) {
-      uint64_t cycle = print_state.cycles[i] + print_state.stamps[i];
+    if (!print_state.deltas[i].empty()) {
+      uint64_t delta = print_state.deltas[i].front();
+      uint64_t cycle = print_state.cycles[i] + delta;
       if (min > cycle) {
         min = cycle;
         print_state.select = i;
@@ -93,48 +101,53 @@ int simif_t::select_print() {
   }
   if (print_state.select >= 0) {
     print_state.cycles[print_state.select] = min;
-    print_state.stamps[print_state.select] = 0;
+    print_state.deltas[print_state.select].pop();
   }
 
   return print_state.select;
 }
 
-void simif_t::read_print_vars() {
-  int sel = print_state.select;
-  assert(sel >= 0 && sel < PRINTS_NUM);
-  size_t chunk = PRINTS_BITS_CHUNKS[sel];
-  data_t* data = new data_t[chunk];
+void simif_t::read_print_vars(size_t id) {
+  const size_t MAX_CHUNK = 32;
+  data_t data[MAX_CHUNK];
+  size_t chunk = PRINTS_BITS_CHUNKS[id];
+  assert(chunk <= MAX_CHUNK);
   for (size_t k = 0 ; k < chunk ; k ++) {
-    data[k] = read(PRINTS_BITS_ADDRS[sel] + k);
+    data[k] = read(PRINTS_BITS_ADDRS[id] + k);
   }
   mpz_t bits;
   mpz_init(bits);
   mpz_import(bits, chunk, -1 , sizeof(data_t), 0, 0, data);
-  delete[] data;
 
-  size_t off = 0;
-  for (size_t k = 0 ; k < print_state.widths[sel].size() ; k++) {
-    mpz_t* var = print_state.vars[sel]->data[k];
-    mpz_t* mask = print_state.masks[sel]->data[k];
+  size_t off = 0, size = print_state.widths[id].size();
+  print_vars_t* vars = new print_vars_t(size);
+  for (size_t k = 0 ; k < size ; k++) {
+    mpz_t* var = vars->data[k];
+    mpz_t* mask = print_state.masks[id]->data[k];
     // *var = bits >> off
     mpz_fdiv_q_2exp(*var, bits, off);
     // *var = *var & *mask
     mpz_and(*var, *var, *mask);
-    off += print_state.widths[sel][k];
+    off += print_state.widths[id][k];
   }
+  print_state.values[id].push(vars);
+  write(PRINTS_READY_ADDRS[id], 1);
 }
 
 void simif_t::clear_print_vars() {
-  write(PRINTS_READY_ADDRS[print_state.select], 1);
+  int sel = print_state.select;
+  assert(sel >= 0 && sel < PRINTS_NUM);
+  free(print_state.values[sel].front());
+  print_state.values[sel].pop();
 }
 
 bool simif_t::detect_prints() {
   int sel = select_print();
 
   if (sel >= 0) {
-    read_print_vars();
     // std::cerr << "[C: " << print_state.cycle[sel] << "]";
-    print_format(print_state.formats[sel].c_str(), print_state.vars[sel]);
+    print_format(print_state.formats[sel].c_str(),
+                 print_state.values[sel].front());
     clear_print_vars();
   } 
 
@@ -161,7 +174,8 @@ void simif_t::init_prints(int argc, char** argv) {
   std::fill(print_state.names.begin(), print_state.names.end(), std::vector<std::string>());
   std::fill(print_state.widths.begin(), print_state.widths.end(), std::vector<size_t>());
   std::fill(print_state.cycles.begin(), print_state.cycles.end(), 0L);
-  std::fill(print_state.stamps.begin(), print_state.stamps.end(), 0);
+  std::fill(print_state.deltas.begin(), print_state.deltas.end(), std::queue<data_t>());
+  std::fill(print_state.values.begin(), print_state.values.end(), std::queue<print_vars_t*>());
   std::string line;
   size_t i = 0;
   enum { PRINT_FMT, PRINT_ARGS } line_state = PRINT_FMT;
@@ -190,7 +204,6 @@ void simif_t::init_prints(int argc, char** argv) {
         assert(token_state == PRINT_NAME);
         size_t size = print_state.widths[i].size();
         assert(size == print_state.names[i].size());
-        print_state.vars[i] = new print_vars_t(size);
         print_state.masks[i] = new print_vars_t(size);
         for (size_t k = 0 ; k < size ; k++) {
            mpz_t* mask = print_state.masks[i]->data[k];

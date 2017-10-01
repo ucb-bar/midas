@@ -63,7 +63,7 @@ $(endpoint_o): $(GEN_DIR)/%.o: $(endpoint_dir)/%.cc $(GEN_DIR)/$(DESIGN)-const.h
 
 addon_files := sample/simif_sample debug/simif_debug
 platform_files := simif simif_$(PLATFORM) sample/sample
-platform_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(platform_files) debug/print.h))
+platform_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(platform_files) debug/print))
 platform_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(platform_files) $(addon_files)))
 platform_o := $(addprefix $(GEN_DIR)/, $(addsuffix .o, $(platform_files) $(addon_files)))
 
@@ -79,7 +79,7 @@ $(OUT_DIR)/$(DESIGN)-$(PLATFORM): $(GEN_DIR)/$(DESIGN)-const.h $(lib) $(DRIVER) 
 $(PLATFORM): $(OUT_DIR)/$(DESIGN)-$(PLATFORM) $(dump_Files) 
 
 emul_files := simif simif_emul emul/mmio_$(PLATFORM) sample/sample
-emul_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(emul_files) emul/mmio))
+emul_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(emul_files) emul/mmio debug/print))
 emul_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(emul_files) $(addon_files)))
 emul_v := $(v_dir)/emul_$(PLATFORM).v
 
