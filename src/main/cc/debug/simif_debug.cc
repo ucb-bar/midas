@@ -74,12 +74,11 @@ void print_format(const char* fmt, print_vars_t* vars) {
 }
 
 int simif_t::select_print() {
-  const size_t bound = 1024;
   bool done;
   do {
     done = true;
     for (size_t i = 0 ; i < PRINTS_NUM ; i++) {
-      if (print_state.values.size() < bound && read(PRINTS_VALID_ADDRS[i])) {
+      if (read(PRINTS_VALID_ADDRS[i])) {
         read_print_vars(i);
         print_state.deltas[i].push(read(PRINTS_DELTA_ADDRS[i]));
         done = false;
@@ -103,7 +102,6 @@ int simif_t::select_print() {
     print_state.cycles[print_state.select] = min;
     print_state.deltas[print_state.select].pop();
   }
-
   return print_state.select;
 }
 
