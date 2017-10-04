@@ -114,7 +114,7 @@ class SimWrapperIO(
     data.elements.toSeq flatMap {
       case (name, rv: ReadyValidIO[_]) => Nil
       case (name, wires) =>
-        val (ins, outs) = SimUtils.parsePorts(wires)
+        val (ins, outs) = parsePorts(wires, prefix = name)
         (ins ++ outs).unzip._1
     }
   })).toSet
