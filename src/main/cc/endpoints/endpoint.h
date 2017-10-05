@@ -8,7 +8,7 @@ class endpoint_t
 public:
   endpoint_t(simif_t* s): sim(s) { }
   virtual void tick() = 0;
-  void init() { }
+  virtual void init() { }
   virtual bool stall() = 0;
   virtual bool done() = 0;
 
