@@ -5,7 +5,8 @@ import java.io.{File, FileWriter, Writer}
 import scala.collection.immutable.ListMap
 
 import freechips.rocketchip.config.Parameters
-import chisel3.{Data, Bundle, Record}
+import chisel3.{Data, Bundle, Record, Clock, Bool}
+import chisel3.internal.firrtl.Port
 import firrtl.ir.Circuit
 import firrtl.CompilerUtils.getLoweringTransforms
 import firrtl.passes.memlib._
@@ -30,7 +31,7 @@ private class VerilogCompiler extends firrtl.Compiler {
 }
 
 // A convenience class that populates a Record with a port list, returned by Module.getPorts 
-class TargetPortRecord(portList: Seq[chisel3.internal.firrtl.Port]) extends Record {
+class TargetPortRecord(portList: Seq[Port]) extends Record {
   val elements = ListMap((for (port <- portList) yield {
       (port.id.instanceName -> port.id.chiselCloneType)
     }):_*)
@@ -38,7 +39,16 @@ class TargetPortRecord(portList: Seq[chisel3.internal.firrtl.Port]) extends Reco
 }
 
 object TargetPortRecord {
-  def apply(mod: chisel3.experimental.RawModule) = new TargetPortRecord(mod.getPorts)
+  def apply(mod: chisel3.experimental.RawModule, excludes: Seq[String] = Seq.empty) = {
+    // In the default case, exclude all clocks, and boots with the name reset (TODO: fix reset).
+    val portList = mod.getPorts flatMap {
+      case Port(id: Clock, _)  => None
+      case Port(id: Bool, _) if id.instanceName == "reset"  => None
+      case Port(id, _) if excludes contains id.instanceName => None
+      case keptPort => Some(keptPort)
+    }
+    new TargetPortRecord(portList)
+  }
 }
 
 object MidasCompiler {
