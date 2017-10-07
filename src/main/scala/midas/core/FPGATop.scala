@@ -13,7 +13,7 @@ case object FpgaMMIOSize extends Field[BigInt]
 
 class FPGATopIO(implicit p: Parameters) extends freechips.rocketchip.util.ParameterizedBundle()(p) {
   val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-  val mem  = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
+  val mem  = Seq.fill(4)(new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
 }
 
 // Platform agnostic wrapper of the simulation models for FPGA 
@@ -115,15 +115,20 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
 
   // Host Memory Channels
   // Masters = Target memory channels + loadMemWidget
-  val arb = Module(new NastiArbiter(memIoSize+1)(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
-  io.mem <> arb.io.slave
-  if (p(MemModelKey) != None) {
-    val loadMem = addWidget(new LoadMemWidget(MemNastiKey), "LOADMEM")
-    loadMem.reset := reset || simReset
-    arb.io.master(memIoSize) <> loadMem.io.toSlaveMem
+  val arb = Seq.fill(4)(Module(new NastiArbiter(memIoSize+1)(p alterPartial ({ case NastiKey => p(MemNastiKey) }))))
+  //io.mem <> arb.io.slave
+  io.mem.zip(arb).foreach {
+    case (mem_i, arb_i) => {mem_i <> arb_i.io.slave
+      if (p(MemModelKey) != None) {
+        val loadMem = addWidget(new LoadMemWidget(MemNastiKey), "LOADMEM")
+        loadMem.reset := reset || simReset
+        arb_i.io.master(memIoSize) <> loadMem.io.toSlaveMem
+      }
+    }
   }
 
   // Instantiate endpoint widgets
+  var mem_model_index=0
   defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {
@@ -134,7 +139,8 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       val widget = addWidget(endpoint.widget(p), widgetName)
       widget.reset := reset || simReset
       widget match {
-        case model: MemModel => arb.io.master(i) <> model.io.host_mem
+        case model: MemModel => { arb(mem_model_index).io.master(i) <> model.io.host_mem
+                                  mem_model_index += 1 }
         case _ =>
       }
       channels2Port(widget.io.hPort, endpoint(i)._2)
@@ -155,12 +161,12 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     "CTRL_ADDR_BITS" -> io.ctrl.nastiXAddrBits,
     "CTRL_DATA_BITS" -> io.ctrl.nastiXDataBits,
     "CTRL_STRB_BITS" -> io.ctrl.nastiWStrobeBits,
-    "MEM_ADDR_BITS"  -> arb.nastiXAddrBits,
-    "MEM_DATA_BITS"  -> arb.nastiXDataBits,
-    "MEM_ID_BITS"    -> arb.nastiXIdBits,
-    "MEM_SIZE_BITS"  -> arb.nastiXSizeBits,
-    "MEM_LEN_BITS"   -> arb.nastiXLenBits,
-    "MEM_RESP_BITS"  -> arb.nastiXRespBits,
-    "MEM_STRB_BITS"  -> arb.nastiWStrobeBits
+    "MEM_ADDR_BITS"  -> arb(0).nastiXAddrBits,
+    "MEM_DATA_BITS"  -> arb(0).nastiXDataBits,
+    "MEM_ID_BITS"    -> arb(0).nastiXIdBits,
+    "MEM_SIZE_BITS"  -> arb(0).nastiXSizeBits,
+    "MEM_LEN_BITS"   -> arb(0).nastiXLenBits,
+    "MEM_RESP_BITS"  -> arb(0).nastiXRespBits,
+    "MEM_STRB_BITS"  -> arb(0).nastiWStrobeBits
   )
 }
