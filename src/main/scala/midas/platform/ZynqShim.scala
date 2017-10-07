@@ -45,5 +45,5 @@ class ZynqShim(simIo: midas.core.SimWrapperIO)
   ) ++ top.headerConsts
 
   top.io.ctrl <> io.master
-  io.slave <> top.io.mem
+  io.slave <> top.io.mem(0)
 }
