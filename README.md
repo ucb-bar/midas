@@ -58,7 +58,7 @@ class ZynqConfigWithLLC(new ZynqConfig ++ new WithMidasLLC)
 
 ### MIDAS Software Driver
 
-In MIDAS, a CPU-hosted *driver* controls the execution of the simulator. The driver is written in C++ by the user. The simplest form of driver uses `peek`, `poke`, `step`, `expect` functions as in [Chisel testers](https://github.com/freechipsproject/chisel-testers.git). The first step is define a virtual class that inherets from `simif_t`. This class describes the execution of the simulator and is agnostic of the host platform. Then, this class is the concretized for each host platform you wish to use, usually twice: once for your FPGA-host platform, and again, for a CPU-only host-platform in which the FPGA-hosted components are simulated using an RTL simulator, like Verilator or Synopsys VCS, for debugging purposes. As an example, here is a software driver for GCD (e.g. in `GCD.h`):
+In MIDAS, a CPU-hosted *driver* controls the execution of the simulator. The driver is written in C++ by the user. The simplest form of driver uses `peek`, `poke`, `step`, `expect` functions as in [Chisel testers](https://github.com/freechipsproject/chisel-testers.git). The first step is define a virtual class that inherets from `simif_t`. This class describes the execution of the simulator and is agnostic of the host platform. Next, this class is concretized for each host platform you wish to use, usually twice: once for your FPGA-host platform, and again, for a CPU-only host-platform in which the FPGA-hosted components are simulated using an RTL simulator like Verilator or Synopsys VCS. As an example, here is a software driver for GCD (e.g. in `GCD.h`):
 ```c++
 #include "simif.h"
 
@@ -139,7 +139,7 @@ The MIDAS compiler is only responsible for generating the RTL that describes the
 
 ### Run emulation / FPGA simulation
 
-To run emulation / FPGA simulation, simply run:
+To start emulation / FPGA simulation, simply run:
 ```
 cd <output_dir>
 ./[binary executable] [+<argument>=<value>]
@@ -171,7 +171,8 @@ First compile the target design using [`strober.replay.Compiler`](src/main/scala
 // lib: File (technology description)
 strober.replay.Compiler(mod, dir, Some(lib))
 ```
-This makes sure the RTL for FPGA simulation and sample replays are the same. Run CAD tools (we recommend using [HAMMER](https://github.com/ucb-bar/hammer)) using the generated Verilog file.
+This makes sure the RTL for 
+simulation and sample replays are the same. Run CAD tools (we recommend using [HAMMER](https://github.com/ucb-bar/hammer)) using the generated Verilog file.
 
 The RTL/gate-level simulators are also compiled in [src/main/cc](src/main/cc):
 ```makefile
@@ -192,7 +193,7 @@ Finally, run the following command to replay samples:
 cd $(OUT_DIR)
 ./<simulator-binary> +sample=<sample file> [+verbose] [+match=<match file>] [+waveform=<vpd file path>] [+vcdfile=<vcd file path>]
 ```
-Note that `+match=<match file path>` is necessary for gate-level simulation to find the state mapping between RTL and gate-level as explained in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
+Note that `+match=<match file path>` is necessary for gate-level simulation to find the state mapping between RTL and gate-level as explained in the [ISCA'16 Strober paper](http://dl.acm.org/citation.cfm?id=3001151).
 
 MIDAS also contains useful scripts for sample replays in [src/main/resources/replay](src/main/resources/replay):
 * [fm-match.py](src/main/resources/replay/fm-match.py): generates the match file for sample replays from Synopsys Formality report files and SVF files.
@@ -205,8 +206,8 @@ For details, run `./<script> -h`.
 ### Templates / Examples
 
 There are two templates you can start with:
-* [strober-example](https://github.com/donggyukim/strober-examples.git): Strober for very simple and small examples.
-* [midas-top](https://github.com/ucb-bar/midas-zynq.git): MIDAS/Strober for RocketChip and BOOM.
+* [midas-examples](https://github.com/ucb-ar/midas-examples.git): Demonstrates MIDAS & Strober with simple examples (like GCD).
+* [midas-top](https://github.com/ucb-bar/midas-top-release.git): Demonstrates MIDAS & Strober use with RocketChip-generated designs (including BOOM).
 
 ## Internal Architecture
 
@@ -217,23 +218,25 @@ This section describes the internal architecture of MIDAS for advanced users.
 The [`MidasTransforms`](src/main/scala/midas/passes/MidasTransforms.scala) composes custom compiler passes to generate FPGA simulators as follows:
 ![transforms](doc/images/transforms.png)
 
-Note that the MIDAS compiler operates on low firrtl to take advantage of low-level optimizations from the FIRRTL compiler.
+The MIDAS passes are designed to act on a low-firrtl graph that, in a VLSI flow, would then be emitted to verilog. This accomplishes two things:
+1) This minimizes the divergence between VLSI-implementation RTL and the RTL being simulated
+2) Saves FPGA resources, as MIDAS transformations can "liven" what would be dead-target RTL, preventing them from being optimized away in later invocations of the FIRRTL optimization passes. 
 
 ### Macro Mapping (Optional)
 
-*Macro Mapping* maps technology-independent macro blocks to technology-dependent macro blocks(SRAMs). This pass is initiated by passing the JSON description to the MIDAS compiler. For implementation details, refer to [barstools](https://github.com/ucb-bar/barstools).
+*Macro Mapping* maps technology-independent macro blocks to technology-dependent macro blocks (SRAMs). This pass is initiated by passing a JSON description to the MIDAS compiler. For implementation details, refer to [barstools](https://github.com/ucb-bar/barstools).
 
 ### FAME1 Transform
-[*FAME1 transform*](src/main/scala/midas/passes/Fame1Transform.scala) decouples the target clock from the host clock by attaching enable signals to all state elements. This enables FPGA performance simulators to stall when timing tokens are not ready. With FAME1 transforms, we can easily control the execution of FPGA simulation with timing token flow controls. The details of this transform are found in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
+[*FAME1 transform*](src/main/scala/midas/passes/Fame1Transform.scala) decouples the target clock from the host clock by attaching enable signals to all state elements. This enables parts of simulator to stall when it is missing ready, allowing the simulator to tolerate variable latencies in the host-platform, and ensuring simulations are deterministic. With FAME1-transformed RTL, the target-time advances in the simulator is governed by timing-token flow control. The details of the transform are found in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151). More detail on host-target decoupling can be found in [the FAME ISCA'10 paper](https://people.eecs.berkeley.edu/~krste/papers/fame-isca2010.pdf). We direct the interested reader to [APort Networks](https://dl.acm.org/citation.cfm?id=1575775) and [Latency-Insensitive Bounded-Dataflow Network](http://people.csail.mit.edu/vmurali/papers/libdns.pdf) which describe two different ways implement host-target clock decoupling. 
 
 ### Scan Chain Insertion (Optional)
-[*Scan chain insertion*](src/main/scala/strober/passes/AddDaisyChain.scala) adds scan chains to take RTL state snapshots for sample replays. Notably, [*all scan chains are implemented in Chisel*](src/main/scala/strober/core/DaisyChain.scala), and this pass compiles the Chisel designs by invoking the FIRRTL compiler inside a FIRRTL pass. This technique, called *Inline Compilation*, removes the necessity of writing all hardware logic with IR, significantly reducing the pass writing overhead. In addtion, the scan chain metadata are dumped (e.g. `<design>.chain`) by [another compiler pass](src/main/scala/strober/passes/DumpChain.scala). The details of scan chains are found in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
+[*Scan chain insertion*](src/main/scala/strober/passes/AddDaisyChain.scala) adds scan chains to take RTL state snapshots for sample replays. Notably, [*all scan chains are implemented in Chisel*](src/main/scala/strober/core/DaisyChain.scala), and this pass elaborates and compiles additional Chisel RTL from within a FIRRTL pass. This technique, called *Inline Compilation*, removes the necessity of writing all hardware logic with IR, significantly reducing the pass writing overhead. Scan-chain metadata are dumped (e.g. `<design>.chain`) by second pass: [DumpChains](src/main/scala/strober/passes/DumpChain.scala). The details of scan-chain insertion passes are found in the [ISCA'16 Strober paper](http://dl.acm.org/citation.cfm?id=3001151).
 
 ### Simulation Mapping
-[*Simulation mapping*](src/main/scala/midas/passes/SimulationMapping.scala) wraps the transformed target design by inserting timing token channels / trace buffers. The result is a platform-independent simulation module for token-based simulation. This pass compiles [the wrapper written in Chisel](src/main/scala/midas/core/SimWrapper.scala) with *Inline Compilation*. The details on communication channels and token-based simulation are found in [the ISCA'16 paper](http://dl.acm.org/citation.cfm?id=3001151).
+[*Simulation mapping*](src/main/scala/midas/passes/SimulationMapping.scala) wraps the transformed target design by inserting timing token channels / trace buffers. The result is a platform-independent simulation module for token-based simulation. This pass compiles [the wrapper written in Chisel](src/main/scala/midas/core/SimWrapper.scala) with *Inline Compilation*. The details on communication channels and token-based simulation are found in the [ISCA'16 Strober paper](http://dl.acm.org/citation.cfm?id=3001151).
 
 ### Platform Mapping
-[*Platform mapping*](src/main/scala/midas/passes/PlatformMapping.scala), the heart of MIDAS, links all simulation modules hosted on FPGA with platform specific logic. First of all, [`FPGATop`](src/main/scala/midas/core/FPGATop.scala) instantiates and connects abstract timing models and helpers implemented using [`Widget`](src/main/scala/midas/widgets) as well as the target module generated by simulation mapping. Next, there are [platform-specific shims](src/main/scala/midas/platform) to adapt the AXI master-slave interface to the platform-specific interfaces. As a final step, the compiler pass compiles the platform shim with *Inline Compilation*, dumps a target and platform specific C++ header file (`<design>-const.h`) for the software driver, and thus, generates the FPGA simulator.
+[*Platform mapping*](src/main/scala/midas/passes/PlatformMapping.scala), the ultimate MIDAS-compiler pass, links all simulation modules hosted on FPGA with platform-specific logic. First of all, [`FPGATop`](src/main/scala/midas/core/FPGATop.scala) instantiates and connects abstract timing models and helpers implemented using [`Widget`](src/main/scala/midas/widgets) as well as the target module generated by simulation mapping. Next, there are [platform-specific shims](src/main/scala/midas/platform) to adapt the AXI master-slave interface to the platform-specific interfaces. As a final step, the compiler pass compiles the platform shim with *Inline Compilation*, dumps a target and platform specific C++ header file (`<design>-const.h`) for the software driver, and thus, generates the FPGA simulator.
 
 ## Advanced Usage
 
@@ -305,6 +308,12 @@ Therefore, in the software driver, non-blocking `n` steps are taken with `step(n
 ### Porting to Other FPGA Platforms
 
 TODO.
+
+## Appendix
+
+### MIDAS's Simulation Execution Model - Host-Target Decoupling
+
+TODO - Different page perhaps
 
 ## Publications
 
