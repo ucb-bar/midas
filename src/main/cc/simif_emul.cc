@@ -74,7 +74,7 @@ void simif_emul_t::init(int argc, char** argv, bool log) {
     }
   }
  
-  for (int i=0; i<4; i++
+  for (int i=0; i<4; i++)
   {
     void* mems[1];
     mems[0] = ::init(memsize, dramsim);
