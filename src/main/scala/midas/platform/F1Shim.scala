@@ -10,7 +10,7 @@ import freechips.rocketchip.config.{Parameters, Field}
 
 class F1ShimIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
   val master = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(MasterNastiKey) })))
-  val slave  = Seq.fill(4)(new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) })))
+  val slave  = Vec(4, new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) })))
 }
 
 class F1Shim(simIo: midas.core.SimWrapperIO)

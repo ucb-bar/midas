@@ -13,7 +13,7 @@ case object FpgaMMIOSize extends Field[BigInt]
 
 class FPGATopIO(implicit p: Parameters) extends freechips.rocketchip.util.ParameterizedBundle()(p) {
   val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-  val mem  = Seq.fill(4)(new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
+  val mem  = Vec(4, new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
 }
 
 // Platform agnostic wrapper of the simulation models for FPGA 
@@ -117,10 +117,10 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
   // Masters = Target memory channels + loadMemWidget
   val arb = Seq.fill(4)(Module(new NastiArbiter(memIoSize+1)(p alterPartial ({ case NastiKey => p(MemNastiKey) }))))
   //io.mem <> arb.io.slave
-  io.mem.zip(arb).foreach {
-    case (mem_i, arb_i) => {mem_i <> arb_i.io.slave
+  (io.mem.zip(arb)).zipWithIndex.foreach {
+    case ((mem_i, arb_i),i) => {mem_i <> arb_i.io.slave
       if (p(MemModelKey) != None) {
-        val loadMem = addWidget(new LoadMemWidget(MemNastiKey), "LOADMEM")
+        val loadMem = addWidget(new LoadMemWidget(MemNastiKey), s"LOADMEM_$i")
         loadMem.reset := reset || simReset
         arb_i.io.master(memIoSize) <> loadMem.io.toSlaveMem
       }
