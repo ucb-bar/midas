@@ -308,12 +308,6 @@ Therefore, in the software driver, non-blocking `n` steps are taken with `step(n
 
 TODO.
 
-## Appendix
-
-### MIDAS's Simulation Execution Model - Host-Target Decoupling
-
-TODO - Different page perhaps
-
 ## Publications
 
 * Donggyu Kim, Adam Izraelevitz, Christopher Celio, Hokeun Kim, Brian Zimmer, Yunsup Lee, Jonathan Bachrach, and Krste Asanović, **"Strober: Fast and Accurate Sample-Based Energy Simulation for Arbitrary RTL"**, International Symposium on Computer Architecture (ISCA-2016), Seoul, Korea, June 2016. ([Paper](https://dl.acm.org/citation.cfm?id=3001151), [Slides](http://isca2016.eecs.umich.edu/wp-content/uploads/2016/07/2B-2.pdf))
