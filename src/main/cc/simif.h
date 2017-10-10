@@ -53,13 +53,12 @@ class simif_t
 #endif
 #ifdef ENABLE_PRINT
   public:
-    print_state_t* get_print_state() { return &print_state; }
     int select_print();
-    void clear_print_vars();
+    print_vars_t* parse_print_vars(int id);
+    print_state_t* get_print_state() { return &print_state; }
 
   private:
     bool detect_prints();
-    void read_print_vars(size_t id);
     void init_prints(int argc, char** argv);
     print_state_t print_state;
 #endif

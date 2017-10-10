@@ -44,41 +44,34 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
   val cycles = Reg(UInt(64.W))
   val enable = RegInit(false.B)
   val enableAddr = attach(enable, "enable")
-  val validAddrs = collection.mutable.ArrayBuffer[Int]()
-  val readyAddrs = collection.mutable.ArrayBuffer[Int]()
   val bitsAddrs = collection.mutable.ArrayBuffer[Int]()
   val bitsChunks = collection.mutable.ArrayBuffer[Int]()
   val deltaAddrs = collection.mutable.ArrayBuffer[Int]()
+  val countAddrs = collection.mutable.ArrayBuffer[Int]()
   val prints = io.prints.bits.elements.zipWithIndex map { case ((_, elem), i) =>
     val width = elem.getWidth - 1
-    val queue = Module(new Queue(UInt(width.W), p(strober.core.TraceMaxLen), flow=true))
-    // FIXME: too big?
-    val delta = Module(new Queue(UInt(32.W),    p(strober.core.TraceMaxLen), flow=true))
-    val last  = RegEnable(Mux(io.tReset.bits, 0.U, cycles),
-                          queue.io.enq.valid || fire && io.tReset.bits)
-    val readyReg = RegInit(false.B)
-    val validReg = RegNext(queue.io.deq.valid)
-    queue suggestName s"queue_${i}"
-    delta suggestName s"delta_${i}"
-    when(false.B) { printf("%d", queue.io.count) }
-    when(false.B) { printf("%d", delta.io.count) }
-    queue.io.enq.bits  := elem >> 1.U
-    queue.io.enq.valid := elem(0) && fire && !io.tReset.bits && enable
-    delta.io.enq.bits  := cycles - last
-    delta.io.enq.valid := queue.io.enq.valid
-    readyAddrs += attach(readyReg, s"prints_${i}_ready", WriteOnly)
-    validAddrs += attach(validReg, s"prints_${i}_valid", ReadOnly)
-    val bits = (0 until width by io.ctrl.nastiXDataBits).zipWithIndex map { case (low, j) =>
-      val high = ((low + io.ctrl.nastiXDataBits) min width) - 1
-      val reg = RegNext(queue.io.deq.bits(high, low))
-      attach(reg, s"prints_${i}_bits_${j}", ReadOnly)
+    val addrs = collection.mutable.ArrayBuffer[Int]()
+    val printFire = fire && enable && elem(0) && !io.tReset.bits
+    val ready = (0 until width by io.ctrl.nastiXDataBits).zipWithIndex map { case (off, j) =>
+      val queue = Module(new Queue(UInt(io.ctrl.nastiXDataBits.W), p(strober.core.TraceMaxLen)))
+      queue.io.enq.bits := (elem >> 1.U) >> off.U
+      queue.io.enq.valid := printFire
+      addrs += attachDecoupledSource(queue.io.deq, s"prints_${i}_bits_${j}")
+      when(false.B) { printf("%d", queue.io.count) }
+      queue suggestName s"queue_${i}_${j}"
+      queue.io.enq.ready
     }
-    bitsAddrs += bits.head
-    bitsChunks += bits.size
+    bitsAddrs  += addrs.head
+    bitsChunks += addrs.size
+    // FIXME: too big?
+    val delta = Module(new Queue(UInt(32.W), p(strober.core.TraceMaxLen)))
+    val last  = RegEnable(Mux(io.tReset.bits, 0.U, cycles), fire && enable && (elem(0) || io.tReset.bits))
+    delta suggestName s"delta_${i}"
+    delta.io.enq.bits  := cycles - last
+    delta.io.enq.valid := printFire
     deltaAddrs += attachDecoupledSource(delta.io.deq, s"prints_${i}_delta")
-    queue.io.deq.ready := readyReg
-    Pulsify(readyReg, pulseLength = 1)
-    queue.io.enq.ready && delta.io.enq.ready
+    countAddrs += attach(RegNext(delta.io.count), s"prints_${i}_count", ReadOnly)
+    (ready foldLeft delta.io.enq.ready)(_ && _)
   }
   fire := (prints foldLeft (io.prints.valid && io.tReset.valid))(_ && _)
   io.tReset.ready := fire
@@ -92,11 +85,10 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
     sb.append(genComment("Print Widget"))
     sb.append(genMacro("PRINTS_NUM", UInt32(p(PrintPorts).size)))
     sb.append(genMacro("PRINTS_ENABLE", UInt32(base + enableAddr)))
-    sb.append(genArray("PRINTS_READY_ADDRS", readyAddrs.toSeq map (x => UInt32(base + x))))
-    sb.append(genArray("PRINTS_VALID_ADDRS", validAddrs.toSeq map (x => UInt32(base + x))))
     sb.append(genArray("PRINTS_BITS_ADDRS", bitsAddrs.toSeq map (x => UInt32(base + x))))
     sb.append(genArray("PRINTS_BITS_CHUNKS", bitsChunks.toSeq map (UInt32(_))))
     sb.append(genArray("PRINTS_DELTA_ADDRS", deltaAddrs.toSeq map (x => UInt32(base + x))))
+    sb.append(genArray("PRINTS_COUNT_ADDRS", countAddrs.toSeq map (x => UInt32(base + x))))
   }
 
   genCRFile()
