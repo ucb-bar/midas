@@ -13,6 +13,7 @@ case object FpgaMMIOSize extends Field[BigInt]
 
 class FPGATopIO(implicit p: Parameters) extends freechips.rocketchip.util.ParameterizedBundle()(p) {
   val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
+  val NICmaster = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
   val mem  = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
 }
 
@@ -137,6 +138,11 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
         case model: MemModel => arb.io.master(i) <> model.io.host_mem
         case _ =>
       }
+      // HACKS
+      if (widget.HAS_PCIS_MASTER) {
+        widget.io.pcisMASTER <> io.NICmaster
+      }
+
       channels2Port(widget.io.hPort, endpoint(i)._2)
       // each widget should have its own reset queue
       val resetQueue = Module(new Queue(Bool(), 4))

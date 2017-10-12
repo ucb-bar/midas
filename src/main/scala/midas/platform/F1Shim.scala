@@ -164,86 +164,12 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
 
   top.io.ctrl <> io.master
   io.slave <> top.io.mem
+  top.io.NICmaster <> io.NICmaster
 
   val (wCounterValue, wCounterWrap) = Counter(io.master.aw.fire(), 4097)
   top.io.ctrl.aw.bits.id := wCounterValue
 
   val (rCounterValue, rCounterWrap) = Counter(io.master.ar.fire(), 4097)
   top.io.ctrl.ar.bits.id := rCounterValue
-
-  // benchmark register reads over 512b interface
-  val LATENCY_IN_NS = 1000 // 1 us
-  val NET_Gb = 64 // 64 Gbps network
-  val PCIE_IF_WIDTH = 512
-  val DEPTH = LATENCY_IN_NS * NET_Gb / PCIE_IF_WIDTH
-  val dataBank = Reg(Vec(DEPTH, UInt(PCIE_IF_WIDTH.W)))
-
-  val aw_queue = Queue(io.NICmaster.aw, 10)
-  val w_queue = Queue(io.NICmaster.w, 10)
-  val ar_queue = Queue(io.NICmaster.ar, 10)
-
-  def fire_write(exclude: Bool, includes: Bool*) = {
-    val rvs = Array (
-      aw_queue.valid,
-      w_queue.valid,
-      io.NICmaster.b.ready
-    )
-    (rvs.filter(_ ne exclude) ++ includes).reduce(_ && _)
-  }
-
-  def fire_read(exclude: Bool, includes: Bool*) = {
-    val rvs = Array (
-      ar_queue.valid,
-      io.NICmaster.r.ready
-    )
-    (rvs.filter(_ ne exclude) ++ includes).reduce(_ && _)
-  }
-
-  val writeBeatCounter = Reg(init = UInt(0, 9.W))
-  when (fire_write(Bool(true), writeBeatCounter === aw_queue.bits.len)) {
-    printf("resetting writeBeatCounter\n")
-    writeBeatCounter := UInt(0)
-  } .elsewhen(fire_write(Bool(true))) {
-    printf("incrementing writeBeatCounter\n")
-    writeBeatCounter := writeBeatCounter + UInt(1)
-  } .otherwise {
-    writeBeatCounter := writeBeatCounter
-  }
-
-  val readBeatCounter = Reg(init = UInt(0, 9.W))
-  when (fire_read(Bool(true), readBeatCounter === ar_queue.bits.len)) {
-    printf("resetting readBeatCounter\n")
-    readBeatCounter := UInt(0)
-  } .elsewhen(fire_read(Bool(true))) {
-    printf("incrementing readBeatCounter\n")
-    readBeatCounter := readBeatCounter + UInt(1)
-  } .otherwise {
-    readBeatCounter := readBeatCounter
-  }
-
-  // TODO is single write resp sufficient?
-  io.NICmaster.b.bits.resp := UInt(0, width=2)
-  io.NICmaster.b.bits.id := aw_queue.bits.id
-  io.NICmaster.b.bits.user := aw_queue.bits.user
-  io.NICmaster.b.valid := fire_write(io.NICmaster.b.ready, writeBeatCounter === aw_queue.bits.len)
-  aw_queue.ready := fire_write(aw_queue.valid, writeBeatCounter === aw_queue.bits.len)
-  w_queue.ready := fire_write(w_queue.valid)
-
-  when (fire_write(Bool(false))) {
-    printf("firing write\n")
-    dataBank((aw_queue.bits.addr >> UInt(6)) + writeBeatCounter) := w_queue.bits.data
-  }
-
-  when (fire_read(Bool(false))) {
-    printf("firing read\n")
-  }
-
-  io.NICmaster.r.valid := fire_read(io.NICmaster.r.ready)
-  io.NICmaster.r.bits.data := dataBank((ar_queue.bits.addr >> UInt(6)) + readBeatCounter)
-  io.NICmaster.r.bits.resp := UInt(0, width=2)
-  io.NICmaster.r.bits.last := readBeatCounter === ar_queue.bits.len
-  io.NICmaster.r.bits.id := ar_queue.bits.id
-  io.NICmaster.r.bits.user := ar_queue.bits.user
-  ar_queue.ready := fire_read(ar_queue.valid, readBeatCounter === ar_queue.bits.len)
 
 }
