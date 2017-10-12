@@ -96,24 +96,31 @@ void mm_magic_t::tick(
     store_addr = aw_addr;
     store_id = aw_id;
     store_count = aw_len + 1;
+    printf("aw fire just update store_count to %d\n", store_count);
     store_size = 1 << aw_size;
     store_inflight = true;
   }
 
   if (w_fire) {
+    printf("i identified a write fire!\n");
     write(store_addr, (uint8_t*)w_data, w_strb, store_size);
     store_addr += store_size;
+    printf("store count in %d\n", store_count);
     store_count--;
+    printf("store count in %d\n", store_count);
 
     if (store_count == 0) {
       store_inflight = false;
       bresp.push(store_id);
+      printf("i just pushed into bresp\n");
       assert(w_last);
     }
   }
 
-  if (b_fire)
-    bresp.pop();
+  if (b_fire) { 
+    bresp.pop(); 
+   printf("i just popped from bresp\n");
+  }
 
   if (r_fire)
     rresp.pop();
@@ -122,6 +129,7 @@ void mm_magic_t::tick(
 
   if (reset) {
     while (!bresp.empty()) bresp.pop();
+    printf("i just resetted bresp\n");
     while (!rresp.empty()) rresp.pop();
     cycle = 0;
   }

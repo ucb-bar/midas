@@ -347,6 +347,8 @@ void tick(
     vc_getScalar(master_b_valid)
   );
 
+  printf("slave_0_w_bits_last before tick is %d\n", vc_getScalar(slave_0_w_bits_last));
+
   slave[0]->tick(
     vcs_rst,
     vc_getScalar(slave_0_ar_valid),
@@ -370,6 +372,7 @@ void tick(
     vc_getScalar(slave_0_b_ready)
   );
 
+  printf("slave_0_w_bits_last after tick is %d\n", vc_getScalar(slave_0_w_bits_last));
 
   slave[1]->tick(
     vcs_rst,
@@ -609,47 +612,161 @@ void tick() {
     top->io_master_b_valid
   );
 
-  top->io_slave_aw_ready = slave->aw_ready();
-  top->io_slave_ar_ready = slave->ar_ready();
-  top->io_slave_w_ready = slave->w_ready();
-  top->io_slave_b_valid = slave->b_valid();
-  top->io_slave_b_bits_id = slave->b_id();
-  top->io_slave_b_bits_resp = slave->b_resp();
-  top->io_slave_r_valid = slave->r_valid();
-  top->io_slave_r_bits_id = slave->r_id();
-  top->io_slave_r_bits_resp = slave->r_resp();
-  top->io_slave_r_bits_last = slave->r_last();
+  top->io_slave_0_aw_ready = slave[0]->aw_ready();
+  top->io_slave_0_ar_ready = slave[0]->ar_ready();
+  top->io_slave_0_w_ready = slave[0]->w_ready();
+  top->io_slave_0_b_valid = slave[0]->b_valid();
+  top->io_slave_0_b_bits_id = slave[0]->b_id();
+  top->io_slave_0_b_bits_resp = slave[0]->b_resp();
+  top->io_slave_0_r_valid = slave[0]->r_valid();
+  top->io_slave_0_r_bits_id = slave[0]->r_id();
+  top->io_slave_0_r_bits_resp = slave[0]->r_resp();
+  top->io_slave_0_r_bits_last = slave[0]->r_last();
+  top->io_slave_1_aw_ready = slave[1]->aw_ready();
+  top->io_slave_1_ar_ready = slave[1]->ar_ready();
+  top->io_slave_1_w_ready = slave[1]->w_ready();
+  top->io_slave_1_b_valid = slave[1]->b_valid();
+  top->io_slave_1_b_bits_id = slave[1]->b_id();
+  top->io_slave_1_b_bits_resp = slave[1]->b_resp();
+  top->io_slave_1_r_valid = slave[1]->r_valid();
+  top->io_slave_1_r_bits_id = slave[1]->r_id();
+  top->io_slave_1_r_bits_resp = slave[1]->r_resp();
+  top->io_slave_1_r_bits_last = slave[1]->r_last();
+  top->io_slave_2_aw_ready = slave[2]->aw_ready();
+  top->io_slave_2_ar_ready = slave[2]->ar_ready();
+  top->io_slave_2_w_ready = slave[2]->w_ready();
+  top->io_slave_2_b_valid = slave[2]->b_valid();
+  top->io_slave_2_b_bits_id = slave[2]->b_id();
+  top->io_slave_2_b_bits_resp = slave[2]->b_resp();
+  top->io_slave_2_r_valid = slave[2]->r_valid();
+  top->io_slave_2_r_bits_id = slave[2]->r_id();
+  top->io_slave_2_r_bits_resp = slave[2]->r_resp();
+  top->io_slave_2_r_bits_last = slave[2]->r_last();
+  top->io_slave_3_aw_ready = slave[3]->aw_ready();
+  top->io_slave_3_ar_ready = slave[3]->ar_ready();
+  top->io_slave_3_w_ready = slave[3]->w_ready();
+  top->io_slave_3_b_valid = slave[3]->b_valid();
+  top->io_slave_3_b_bits_id = slave[3]->b_id();
+  top->io_slave_3_b_bits_resp = slave[3]->b_resp();
+  top->io_slave_3_r_valid = slave[3]->r_valid();
+  top->io_slave_3_r_bits_id = slave[3]->r_id();
+  top->io_slave_3_r_bits_resp = slave[3]->r_resp();
+  top->io_slave_3_r_bits_last = slave[3]->r_last();
 #if MEM_DATA_BITS > 64
-  memcpy(top->io_slave_r_bits_data, slave->r_data(), MEM_WIDTH);
+  memcpy(top->io_slave_0_r_bits_data, slave[0]->r_data(), MEM_WIDTH);
+  memcpy(top->io_slave_1_r_bits_data, slave[1]->r_data(), MEM_WIDTH);
+  memcpy(top->io_slave_2_r_bits_data, slave[2]->r_data(), MEM_WIDTH);
+  memcpy(top->io_slave_3_r_bits_data, slave[3]->r_data(), MEM_WIDTH);
 #else
-  memcpy(&top->io_slave_r_bits_data, slave->r_data(), MEM_WIDTH);
+  memcpy(&top->io_slave_0_r_bits_data, slave[0]->r_data(), MEM_WIDTH);
+  memcpy(&top->io_slave_1_r_bits_data, slave[1]->r_data(), MEM_WIDTH);
+  memcpy(&top->io_slave_2_r_bits_data, slave[2]->r_data(), MEM_WIDTH);
+  memcpy(&top->io_slave_3_r_bits_data, slave[3]->r_data(), MEM_WIDTH);
 #endif
 
-  slave->tick(
+  slave[0]->tick(
     top->reset,
-    top->io_slave_ar_valid,
-    top->io_slave_ar_bits_addr,
-    top->io_slave_ar_bits_id,
-    top->io_slave_ar_bits_size,
-    top->io_slave_ar_bits_len,
+    top->io_slave_0_ar_valid,
+    top->io_slave_0_ar_bits_addr,
+    top->io_slave_0_ar_bits_id,
+    top->io_slave_0_ar_bits_size,
+    top->io_slave_0_ar_bits_len,
 
-    top->io_slave_aw_valid,
-    top->io_slave_aw_bits_addr,
-    top->io_slave_aw_bits_id,
-    top->io_slave_aw_bits_size,
-    top->io_slave_aw_bits_len,
+    top->io_slave_0_aw_valid,
+    top->io_slave_0_aw_bits_addr,
+    top->io_slave_0_aw_bits_id,
+    top->io_slave_0_aw_bits_size,
+    top->io_slave_0_aw_bits_len,
 
-    top->io_slave_w_valid,
-    top->io_slave_w_bits_strb,
+    top->io_slave_0_w_valid,
+    top->io_slave_0_w_bits_strb,
 #if MEM_DATA_BITS > 64
-    top->io_slave_w_bits_data,
+    top->io_slave_0_w_bits_data,
 #else
-    &top->io_slave_w_bits_data,
+    &top->io_slave_0_w_bits_data,
 #endif
-    top->io_slave_w_bits_last,
+    top->io_slave_0_w_bits_last,
   
-    top->io_slave_r_ready,
-    top->io_slave_b_ready
+    top->io_slave_0_r_ready,
+    top->io_slave_0_b_ready
+  );
+  slave[1]->tick(
+    top->reset,
+    top->io_slave_1_ar_valid,
+    top->io_slave_1_ar_bits_addr,
+    top->io_slave_1_ar_bits_id,
+    top->io_slave_1_ar_bits_size,
+    top->io_slave_1_ar_bits_len,
+
+    top->io_slave_1_aw_valid,
+    top->io_slave_1_aw_bits_addr,
+    top->io_slave_1_aw_bits_id,
+    top->io_slave_1_aw_bits_size,
+    top->io_slave_1_aw_bits_len,
+
+    top->io_slave_1_w_valid,
+    top->io_slave_1_w_bits_strb,
+#if MEM_DATA_BITS > 64
+    top->io_slave_1_w_bits_data,
+#else
+    &top->io_slave_1_w_bits_data,
+#endif
+    top->io_slave_1_w_bits_last,
+  
+    top->io_slave_1_r_ready,
+    top->io_slave_1_b_ready
+  );
+  slave[2]->tick(
+    top->reset,
+    top->io_slave_2_ar_valid,
+    top->io_slave_2_ar_bits_addr,
+    top->io_slave_2_ar_bits_id,
+    top->io_slave_2_ar_bits_size,
+    top->io_slave_2_ar_bits_len,
+
+    top->io_slave_2_aw_valid,
+    top->io_slave_2_aw_bits_addr,
+    top->io_slave_2_aw_bits_id,
+    top->io_slave_2_aw_bits_size,
+    top->io_slave_2_aw_bits_len,
+
+    top->io_slave_2_w_valid,
+    top->io_slave_2_w_bits_strb,
+#if MEM_DATA_BITS > 64
+    top->io_slave_2_w_bits_data,
+#else
+    &top->io_slave_2_w_bits_data,
+#endif
+    top->io_slave_2_w_bits_last,
+  
+    top->io_slave_2_r_ready,
+    top->io_slave_2_b_ready
+  );
+  slave[3]->tick(
+    top->reset,
+    top->io_slave_3_ar_valid,
+    top->io_slave_3_ar_bits_addr,
+    top->io_slave_3_ar_bits_id,
+    top->io_slave_3_ar_bits_size,
+    top->io_slave_3_ar_bits_len,
+
+    top->io_slave_3_aw_valid,
+    top->io_slave_3_aw_bits_addr,
+    top->io_slave_3_aw_bits_id,
+    top->io_slave_3_aw_bits_size,
+    top->io_slave_3_aw_bits_len,
+
+    top->io_slave_3_w_valid,
+    top->io_slave_3_w_bits_strb,
+#if MEM_DATA_BITS > 64
+    top->io_slave_3_w_bits_data,
+#else
+    &top->io_slave_3_w_bits_data,
+#endif
+    top->io_slave_3_w_bits_last,
+  
+    top->io_slave_3_r_ready,
+    top->io_slave_3_b_ready
   );
 
   top->clock = 0;
