@@ -77,7 +77,7 @@ void simif_emul_t::init(int argc, char** argv, bool log) {
   for (int i=0; i<4; i++)
   {
     void* mems[1];
-    mems[0] = ::init(memsize, dramsim);
+    mems[0] = ::init(memsize, dramsim, i);
     if (mems[0] && fastloadmem && !loadmem.empty()) {
       fprintf(stdout, "[fast loadmem] %s\n", loadmem.c_str());
       ::load_mem(mems, loadmem.c_str(), MEM_DATA_BITS / 8, 1);

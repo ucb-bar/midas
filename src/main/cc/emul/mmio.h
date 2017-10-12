@@ -12,6 +12,6 @@ public:
   virtual bool write_resp() = 0;
 };
 
-void* init(uint64_t memsize, bool dram);
+void* init(uint64_t memsize, bool dram, int mem_index);
 
 #endif // __MMIO_H

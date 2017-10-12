@@ -87,13 +87,13 @@ bool mmio_f1_t::write_resp() {
 
 extern uint64_t main_time;
 extern std::unique_ptr<mmio_t> master;
-std::unique_ptr<mm_t> slave;
+std::unique_ptr<mm_t> slave[4];
 
-void* init(uint64_t memsize, bool dramsim) {
+void* init(uint64_t memsize, bool dramsim, int mem_index) {
   master.reset(new mmio_f1_t);
-  slave.reset(dramsim ? (mm_t*) new mm_dramsim2_t : (mm_t*) new mm_magic_t);
-  slave->init(memsize, MEM_WIDTH, 64);
-  return slave->get_data();
+  slave[mem_index].reset(dramsim ? (mm_t*) new mm_dramsim2_t : (mm_t*) new mm_magic_t);
+  slave[mem_index]->init(memsize, MEM_WIDTH, 64);
+  return slave[mem_index]->get_data();
 }
 
 #ifdef VCS
@@ -139,37 +139,136 @@ void tick(
   vc_handle master_b_bits_resp,
   vc_handle master_b_bits_id,
 
-  vc_handle slave_ar_valid,
-  vc_handle slave_ar_ready,
-  vc_handle slave_ar_bits_addr,
-  vc_handle slave_ar_bits_id,
-  vc_handle slave_ar_bits_size,
-  vc_handle slave_ar_bits_len,
+  vc_handle slave_0_ar_valid,
+  vc_handle slave_0_ar_ready,
+  vc_handle slave_0_ar_bits_addr,
+  vc_handle slave_0_ar_bits_id,
+  vc_handle slave_0_ar_bits_size,
+  vc_handle slave_0_ar_bits_len,
 
-  vc_handle slave_aw_valid,
-  vc_handle slave_aw_ready,
-  vc_handle slave_aw_bits_addr,
-  vc_handle slave_aw_bits_id,
-  vc_handle slave_aw_bits_size,
-  vc_handle slave_aw_bits_len,
+  vc_handle slave_0_aw_valid,
+  vc_handle slave_0_aw_ready,
+  vc_handle slave_0_aw_bits_addr,
+  vc_handle slave_0_aw_bits_id,
+  vc_handle slave_0_aw_bits_size,
+  vc_handle slave_0_aw_bits_len,
 
-  vc_handle slave_w_valid,
-  vc_handle slave_w_ready,
-  vc_handle slave_w_bits_strb,
-  vc_handle slave_w_bits_data,
-  vc_handle slave_w_bits_last,
+  vc_handle slave_0_w_valid,
+  vc_handle slave_0_w_ready,
+  vc_handle slave_0_w_bits_strb,
+  vc_handle slave_0_w_bits_data,
+  vc_handle slave_0_w_bits_last,
 
-  vc_handle slave_r_valid,
-  vc_handle slave_r_ready,
-  vc_handle slave_r_bits_resp,
-  vc_handle slave_r_bits_id,
-  vc_handle slave_r_bits_data,
-  vc_handle slave_r_bits_last,
+  vc_handle slave_0_r_valid,
+  vc_handle slave_0_r_ready,
+  vc_handle slave_0_r_bits_resp,
+  vc_handle slave_0_r_bits_id,
+  vc_handle slave_0_r_bits_data,
+  vc_handle slave_0_r_bits_last,
 
-  vc_handle slave_b_valid,
-  vc_handle slave_b_ready,
-  vc_handle slave_b_bits_resp,
-  vc_handle slave_b_bits_id
+  vc_handle slave_0_b_valid,
+  vc_handle slave_0_b_ready,
+  vc_handle slave_0_b_bits_resp,
+  vc_handle slave_0_b_bits_id,
+
+
+  vc_handle slave_1_ar_valid,
+  vc_handle slave_1_ar_ready,
+  vc_handle slave_1_ar_bits_addr,
+  vc_handle slave_1_ar_bits_id,
+  vc_handle slave_1_ar_bits_size,
+  vc_handle slave_1_ar_bits_len,
+
+  vc_handle slave_1_aw_valid,
+  vc_handle slave_1_aw_ready,
+  vc_handle slave_1_aw_bits_addr,
+  vc_handle slave_1_aw_bits_id,
+  vc_handle slave_1_aw_bits_size,
+  vc_handle slave_1_aw_bits_len,
+
+  vc_handle slave_1_w_valid,
+  vc_handle slave_1_w_ready,
+  vc_handle slave_1_w_bits_strb,
+  vc_handle slave_1_w_bits_data,
+  vc_handle slave_1_w_bits_last,
+
+  vc_handle slave_1_r_valid,
+  vc_handle slave_1_r_ready,
+  vc_handle slave_1_r_bits_resp,
+  vc_handle slave_1_r_bits_id,
+  vc_handle slave_1_r_bits_data,
+  vc_handle slave_1_r_bits_last,
+
+  vc_handle slave_1_b_valid,
+  vc_handle slave_1_b_ready,
+  vc_handle slave_1_b_bits_resp,
+  vc_handle slave_1_b_bits_id,
+
+
+  vc_handle slave_2_ar_valid,
+  vc_handle slave_2_ar_ready,
+  vc_handle slave_2_ar_bits_addr,
+  vc_handle slave_2_ar_bits_id,
+  vc_handle slave_2_ar_bits_size,
+  vc_handle slave_2_ar_bits_len,
+
+  vc_handle slave_2_aw_valid,
+  vc_handle slave_2_aw_ready,
+  vc_handle slave_2_aw_bits_addr,
+  vc_handle slave_2_aw_bits_id,
+  vc_handle slave_2_aw_bits_size,
+  vc_handle slave_2_aw_bits_len,
+
+  vc_handle slave_2_w_valid,
+  vc_handle slave_2_w_ready,
+  vc_handle slave_2_w_bits_strb,
+  vc_handle slave_2_w_bits_data,
+  vc_handle slave_2_w_bits_last,
+
+  vc_handle slave_2_r_valid,
+  vc_handle slave_2_r_ready,
+  vc_handle slave_2_r_bits_resp,
+  vc_handle slave_2_r_bits_id,
+  vc_handle slave_2_r_bits_data,
+  vc_handle slave_2_r_bits_last,
+
+  vc_handle slave_2_b_valid,
+  vc_handle slave_2_b_ready,
+  vc_handle slave_2_b_bits_resp,
+  vc_handle slave_2_b_bits_id,
+
+
+  vc_handle slave_3_ar_valid,
+  vc_handle slave_3_ar_ready,
+  vc_handle slave_3_ar_bits_addr,
+  vc_handle slave_3_ar_bits_id,
+  vc_handle slave_3_ar_bits_size,
+  vc_handle slave_3_ar_bits_len,
+
+  vc_handle slave_3_aw_valid,
+  vc_handle slave_3_aw_ready,
+  vc_handle slave_3_aw_bits_addr,
+  vc_handle slave_3_aw_bits_id,
+  vc_handle slave_3_aw_bits_size,
+  vc_handle slave_3_aw_bits_len,
+
+  vc_handle slave_3_w_valid,
+  vc_handle slave_3_w_ready,
+  vc_handle slave_3_w_bits_strb,
+  vc_handle slave_3_w_bits_data,
+  vc_handle slave_3_w_bits_last,
+
+  vc_handle slave_3_r_valid,
+  vc_handle slave_3_r_ready,
+  vc_handle slave_3_r_bits_resp,
+  vc_handle slave_3_r_bits_id,
+  vc_handle slave_3_r_bits_data,
+  vc_handle slave_3_r_bits_last,
+
+  vc_handle slave_3_b_valid,
+  vc_handle slave_3_b_ready,
+  vc_handle slave_3_b_bits_resp,
+  vc_handle slave_3_b_bits_id
 ) {
   mmio_f1_t* m;
   assert(m = dynamic_cast<mmio_f1_t*>(master.get()));
@@ -177,11 +276,22 @@ void tick(
   for (size_t i = 0 ; i < MASTER_DATA_SIZE ; i++) {
     master_r_data[i] = vc_4stVectorRef(master_r_bits_data)[i].d;
   }
-  uint32_t slave_w_data[SLAVE_DATA_SIZE];
+  uint32_t slave_0_w_data[SLAVE_DATA_SIZE];
   for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
-    slave_w_data[i] = vc_4stVectorRef(slave_w_bits_data)[i].d;
+    slave_0_w_data[i] = vc_4stVectorRef(slave_0_w_bits_data)[i].d;
   }
-
+  uint32_t slave_1_w_data[SLAVE_DATA_SIZE];
+  for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
+    slave_1_w_data[i] = vc_4stVectorRef(slave_1_w_bits_data)[i].d;
+  }
+  uint32_t slave_2_w_data[SLAVE_DATA_SIZE];
+  for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
+    slave_2_w_data[i] = vc_4stVectorRef(slave_2_w_bits_data)[i].d;
+  }
+  uint32_t slave_3_w_data[SLAVE_DATA_SIZE];
+  for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
+    slave_3_w_data[i] = vc_4stVectorRef(slave_3_w_bits_data)[i].d;
+  }
   vc_putScalar(master_aw_valid, m->aw_valid());
   vc_putScalar(master_ar_valid, m->ar_valid());
   vc_putScalar(master_w_valid, m->w_valid());
@@ -237,54 +347,200 @@ void tick(
     vc_getScalar(master_b_valid)
   );
 
-  slave->tick(
+  slave[0]->tick(
     vcs_rst,
-    vc_getScalar(slave_ar_valid),
-    vc_4stVectorRef(slave_ar_bits_addr)->d,
-    vc_4stVectorRef(slave_ar_bits_id)->d,
-    vc_4stVectorRef(slave_ar_bits_size)->d,
-    vc_4stVectorRef(slave_ar_bits_len)->d,
+    vc_getScalar(slave_0_ar_valid),
+    vc_4stVectorRef(slave_0_ar_bits_addr)->d,
+    vc_4stVectorRef(slave_0_ar_bits_id)->d,
+    vc_4stVectorRef(slave_0_ar_bits_size)->d,
+    vc_4stVectorRef(slave_0_ar_bits_len)->d,
 
-    vc_getScalar(slave_aw_valid),
-    vc_4stVectorRef(slave_aw_bits_addr)->d,
-    vc_4stVectorRef(slave_aw_bits_id)->d,
-    vc_4stVectorRef(slave_aw_bits_size)->d,
-    vc_4stVectorRef(slave_aw_bits_len)->d,
+    vc_getScalar(slave_0_aw_valid),
+    vc_4stVectorRef(slave_0_aw_bits_addr)->d,
+    vc_4stVectorRef(slave_0_aw_bits_id)->d,
+    vc_4stVectorRef(slave_0_aw_bits_size)->d,
+    vc_4stVectorRef(slave_0_aw_bits_len)->d,
 
-    vc_getScalar(slave_w_valid),
-    vc_4stVectorRef(slave_w_bits_strb)->d,
-    slave_w_data,
-    vc_getScalar(slave_w_bits_last),
+    vc_getScalar(slave_0_w_valid),
+    vc_4stVectorRef(slave_0_w_bits_strb)->d,
+    slave_0_w_data,
+    vc_getScalar(slave_0_w_bits_last),
 
-    vc_getScalar(slave_r_ready),
-    vc_getScalar(slave_b_ready)
+    vc_getScalar(slave_0_r_ready),
+    vc_getScalar(slave_0_b_ready)
   );
 
-  vc_putScalar(slave_aw_ready, slave->aw_ready());
-  vc_putScalar(slave_ar_ready, slave->ar_ready());
-  vc_putScalar(slave_w_ready, slave->w_ready());
-  vc_putScalar(slave_b_valid, slave->b_valid());
-  vc_putScalar(slave_r_valid, slave->r_valid());
-  vc_putScalar(slave_r_bits_last, slave->r_last());
+
+  slave[1]->tick(
+    vcs_rst,
+    vc_getScalar(slave_1_ar_valid),
+    vc_4stVectorRef(slave_1_ar_bits_addr)->d,
+    vc_4stVectorRef(slave_1_ar_bits_id)->d,
+    vc_4stVectorRef(slave_1_ar_bits_size)->d,
+    vc_4stVectorRef(slave_1_ar_bits_len)->d,
+
+    vc_getScalar(slave_1_aw_valid),
+    vc_4stVectorRef(slave_1_aw_bits_addr)->d,
+    vc_4stVectorRef(slave_1_aw_bits_id)->d,
+    vc_4stVectorRef(slave_1_aw_bits_size)->d,
+    vc_4stVectorRef(slave_1_aw_bits_len)->d,
+
+    vc_getScalar(slave_1_w_valid),
+    vc_4stVectorRef(slave_1_w_bits_strb)->d,
+    slave_1_w_data,
+    vc_getScalar(slave_1_w_bits_last),
+
+    vc_getScalar(slave_1_r_ready),
+    vc_getScalar(slave_1_b_ready)
+  );
+
+
+  slave[2]->tick(
+    vcs_rst,
+    vc_getScalar(slave_2_ar_valid),
+    vc_4stVectorRef(slave_2_ar_bits_addr)->d,
+    vc_4stVectorRef(slave_2_ar_bits_id)->d,
+    vc_4stVectorRef(slave_2_ar_bits_size)->d,
+    vc_4stVectorRef(slave_2_ar_bits_len)->d,
+
+    vc_getScalar(slave_2_aw_valid),
+    vc_4stVectorRef(slave_2_aw_bits_addr)->d,
+    vc_4stVectorRef(slave_2_aw_bits_id)->d,
+    vc_4stVectorRef(slave_2_aw_bits_size)->d,
+    vc_4stVectorRef(slave_2_aw_bits_len)->d,
+
+    vc_getScalar(slave_2_w_valid),
+    vc_4stVectorRef(slave_2_w_bits_strb)->d,
+    slave_2_w_data,
+    vc_getScalar(slave_2_w_bits_last),
+
+    vc_getScalar(slave_2_r_ready),
+    vc_getScalar(slave_2_b_ready)
+  );
+
+
+  slave[3]->tick(
+    vcs_rst,
+    vc_getScalar(slave_3_ar_valid),
+    vc_4stVectorRef(slave_3_ar_bits_addr)->d,
+    vc_4stVectorRef(slave_3_ar_bits_id)->d,
+    vc_4stVectorRef(slave_3_ar_bits_size)->d,
+    vc_4stVectorRef(slave_3_ar_bits_len)->d,
+
+    vc_getScalar(slave_3_aw_valid),
+    vc_4stVectorRef(slave_3_aw_bits_addr)->d,
+    vc_4stVectorRef(slave_3_aw_bits_id)->d,
+    vc_4stVectorRef(slave_3_aw_bits_size)->d,
+    vc_4stVectorRef(slave_3_aw_bits_len)->d,
+
+    vc_getScalar(slave_3_w_valid),
+    vc_4stVectorRef(slave_3_w_bits_strb)->d,
+    slave_3_w_data,
+    vc_getScalar(slave_3_w_bits_last),
+
+    vc_getScalar(slave_3_r_ready),
+    vc_getScalar(slave_3_b_ready)
+  );
+
+  vc_putScalar(slave_0_aw_ready, slave[0]->aw_ready());
+  vc_putScalar(slave_0_ar_ready, slave[0]->ar_ready());
+  vc_putScalar(slave_0_w_ready, slave[0]->w_ready());
+  vc_putScalar(slave_0_b_valid, slave[0]->b_valid());
+  vc_putScalar(slave_0_r_valid, slave[0]->r_valid());
+  vc_putScalar(slave_0_r_bits_last, slave[0]->r_last());
+
+  vc_putScalar(slave_1_aw_ready, slave[1]->aw_ready());
+  vc_putScalar(slave_1_ar_ready, slave[1]->ar_ready());
+  vc_putScalar(slave_1_w_ready, slave[1]->w_ready());
+  vc_putScalar(slave_1_b_valid, slave[1]->b_valid());
+  vc_putScalar(slave_1_r_valid, slave[1]->r_valid());
+  vc_putScalar(slave_1_r_bits_last, slave[1]->r_last());
+
+  vc_putScalar(slave_2_aw_ready, slave[2]->aw_ready());
+  vc_putScalar(slave_2_ar_ready, slave[2]->ar_ready());
+  vc_putScalar(slave_2_w_ready, slave[2]->w_ready());
+  vc_putScalar(slave_2_b_valid, slave[2]->b_valid());
+  vc_putScalar(slave_2_r_valid, slave[2]->r_valid());
+  vc_putScalar(slave_2_r_bits_last, slave[2]->r_last());
+
+  vc_putScalar(slave_3_aw_ready, slave[3]->aw_ready());
+  vc_putScalar(slave_3_ar_ready, slave[3]->ar_ready());
+  vc_putScalar(slave_3_w_ready, slave[3]->w_ready());
+  vc_putScalar(slave_3_b_valid, slave[3]->b_valid());
+  vc_putScalar(slave_3_r_valid, slave[3]->r_valid());
+  vc_putScalar(slave_3_r_bits_last, slave[3]->r_last());
+
 
   vec32 sd[SLAVE_DATA_SIZE];
   sd[0].c = 0;
-  sd[0].d = slave->b_id();
-  vc_put4stVector(slave_b_bits_id, sd);
+  sd[0].d = slave[0]->b_id();
+  vc_put4stVector(slave_0_b_bits_id, sd);
   sd[0].c = 0;
-  sd[0].d = slave->b_resp();
-  vc_put4stVector(slave_b_bits_resp, sd);
+  sd[0].d = slave[0]->b_resp();
+  vc_put4stVector(slave_0_b_bits_resp, sd);
   sd[0].c = 0;
-  sd[0].d = slave->r_id();
-  vc_put4stVector(slave_r_bits_id, sd);
+  sd[0].d = slave[0]->r_id();
+  vc_put4stVector(slave_0_r_bits_id, sd);
   sd[0].c = 0;
-  sd[0].d = slave->r_resp();
-  vc_put4stVector(slave_r_bits_resp, sd);
+  sd[0].d = slave[0]->r_resp();
+  vc_put4stVector(slave_0_r_bits_resp, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[1]->b_id();
+  vc_put4stVector(slave_1_b_bits_id, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[1]->b_resp();
+  vc_put4stVector(slave_1_b_bits_resp, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[1]->r_id();
+  vc_put4stVector(slave_1_r_bits_id, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[1]->r_resp();
+  vc_put4stVector(slave_1_r_bits_resp, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[2]->b_id();
+  vc_put4stVector(slave_2_b_bits_id, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[2]->b_resp();
+  vc_put4stVector(slave_2_b_bits_resp, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[2]->r_id();
+  vc_put4stVector(slave_2_r_bits_id, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[2]->r_resp();
+  vc_put4stVector(slave_2_r_bits_resp, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[3]->b_id();
+  vc_put4stVector(slave_3_b_bits_id, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[3]->b_resp();
+  vc_put4stVector(slave_3_b_bits_resp, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[3]->r_id();
+  vc_put4stVector(slave_3_r_bits_id, sd);
+  sd[0].c = 0;
+  sd[0].d = slave[3]->r_resp();
+  vc_put4stVector(slave_3_r_bits_resp, sd);
+ 
   for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
     sd[i].c = 0;
-    sd[i].d = ((uint32_t*) slave->r_data())[i];
+    sd[i].d = ((uint32_t*) slave[0]->r_data())[i];
   }
-  vc_put4stVector(slave_r_bits_data, sd);
+  vc_put4stVector(slave_0_r_bits_data, sd);
+  for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
+    sd[i].c = 0;
+    sd[i].d = ((uint32_t*) slave[1]->r_data())[i];
+  }
+  vc_put4stVector(slave_1_r_bits_data, sd);
+  for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
+    sd[i].c = 0;
+    sd[i].d = ((uint32_t*) slave[2]->r_data())[i];
+  }
+  vc_put4stVector(slave_2_r_bits_data, sd);
+  for (size_t i = 0 ; i < SLAVE_DATA_SIZE ; i++) {
+    sd[i].c = 0;
+    sd[i].d = ((uint32_t*) slave[3]->r_data())[i];
+  }
+  vc_put4stVector(slave_3_r_bits_data, sd);
   vc_putScalar(reset, vcs_rst);
   vc_putScalar(fin, vcs_fin);
 

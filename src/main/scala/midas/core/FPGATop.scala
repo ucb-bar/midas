@@ -115,14 +115,14 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
 
   // Host Memory Channels
   // Masters = Target memory channels + loadMemWidget
-  val arb = Seq.fill(4)(Module(new NastiArbiter(memIoSize+1)(p alterPartial ({ case NastiKey => p(MemNastiKey) }))))
+  val arb = Seq.fill(4)(Module(new NastiArbiter(/*memIoSize+1*/2)(p alterPartial ({ case NastiKey => p(MemNastiKey) }))))
   //io.mem <> arb.io.slave
   (io.mem.zip(arb)).zipWithIndex.foreach {
     case ((mem_i, arb_i),i) => {mem_i <> arb_i.io.slave
       if (p(MemModelKey) != None) {
         val loadMem = addWidget(new LoadMemWidget(MemNastiKey), s"LOADMEM_$i")
         loadMem.reset := reset || simReset
-        arb_i.io.master(memIoSize) <> loadMem.io.toSlaveMem
+        arb_i.io.master(1/*memIoSize*/) <> loadMem.io.toSlaveMem
       }
     }
   }
@@ -139,7 +139,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       val widget = addWidget(endpoint.widget(p), widgetName)
       widget.reset := reset || simReset
       widget match {
-        case model: MemModel => { arb(mem_model_index).io.master(i) <> model.io.host_mem
+        case model: MemModel => { arb(mem_model_index).io.master(0) <> model.io.host_mem
                                   mem_model_index += 1 }
         case _ =>
       }

@@ -64,6 +64,9 @@ public:
   bool r_ready() { return read_inflight; }
   bool b_ready() { return write_inflight; }
 
+
+  void* init(uint64_t memsize, bool dramsim, int mem_index);
+
   void tick
   (
     bool reset,
