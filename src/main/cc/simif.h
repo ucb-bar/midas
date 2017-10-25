@@ -53,12 +53,12 @@ class simif_t
 #endif
 #ifdef ENABLE_PRINT
   public:
-    int select_print();
-    print_vars_t* parse_print_vars(int id);
+    bool read_prints();
+    bool parse_print_vars();
     print_state_t* get_print_state() { return &print_state; }
 
   private:
-    bool detect_prints();
+    void show_prints();
     void init_prints(int argc, char** argv);
     print_state_t print_state;
 #endif
@@ -73,7 +73,9 @@ class simif_t
       detect_assert();
 #endif
 #ifdef ENABLE_PRINT
-      while(print_state.enable && detect_prints());
+      while(print_state.enable && read_prints()) {
+        show_prints();
+      }
 #endif
       return read(MASTER(DONE));
     }
@@ -81,6 +83,7 @@ class simif_t
     // Widget communication
     virtual void write(size_t addr, data_t data) = 0;
     virtual data_t read(size_t addr) = 0;
+    virtual size_t pread(size_t addr, char* data, size_t size) = 0;
 
     inline void poke(size_t id, data_t value) {
       if (log) fprintf(stderr, "* POKE %s.%s <- 0x%x *\n",

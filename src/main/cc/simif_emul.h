@@ -17,6 +17,7 @@ class simif_emul_t : public virtual simif_t
   protected:
     virtual void write(size_t addr, data_t data);
     virtual data_t read(size_t addr);
+    virtual size_t pread(size_t addr, char* data, size_t size);
 };
 
 #endif // __SIMIF_VERILATOR_H
