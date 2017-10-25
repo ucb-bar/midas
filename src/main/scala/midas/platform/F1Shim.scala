@@ -7,9 +7,11 @@ import chisel3._
 import chisel3.util._
 import junctions._
 import config.{Parameters, Field}
+import midas.core.DMANastiKey
 
 class F1ShimIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
   val master = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(MasterNastiKey) })))
+  val dma    = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
   val slave  = new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) }))
 }
 
@@ -17,6 +19,7 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
               (implicit p: Parameters) extends PlatformShim {
   val io = IO(new F1ShimIO)
   val top = Module(new midas.core.FPGATop(simIo))
+
   val headerConsts = List(
     "MMIO_WIDTH" -> p(MasterNastiKey).dataBits / 8,
     "MEM_WIDTH"  -> p(SlaveNastiKey).dataBits / 8
@@ -26,6 +29,7 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
   cyclecount := cyclecount + UInt(1)
 
   // print all transactions
+  /*
   when (io.master.aw.fire()) {
     printf("[master,awfire,%x] addr %x, len %x, size %x, burst %x, lock %x, cache %x, prot %x, qos %x, region %x, id %x, user %x\n",
       cyclecount,
@@ -88,6 +92,34 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
       io.master.r.bits.last,
       io.master.r.bits.id,
       io.master.r.bits.user
+      )
+  }
+
+  when (io.dma.ar.fire()) {
+    printf("[dma,arfire,%x] addr %x, len %x, size %x, burst %x, lock %x, cache %x, prot %x, qos %x, region %x, id %x, user %x\n",
+      cyclecount,
+      io.dma.ar.bits.addr,
+      io.dma.ar.bits.len,
+      io.dma.ar.bits.size,
+      io.dma.ar.bits.burst,
+      io.dma.ar.bits.lock,
+      io.dma.ar.bits.cache,
+      io.dma.ar.bits.prot,
+      io.dma.ar.bits.qos,
+      io.dma.ar.bits.region,
+      io.dma.ar.bits.id,
+      io.dma.ar.bits.user
+      )
+  }
+
+  when (io.dma.r.fire()) {
+    printf("[dma,rfire,%x] resp %x, data %x, last %x, id %x, user %x\n",
+      cyclecount,
+      io.dma.r.bits.resp,
+      io.dma.r.bits.data,
+      io.dma.r.bits.last,
+      io.dma.r.bits.id,
+      io.dma.r.bits.user
       )
   }
 
@@ -160,9 +192,11 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
       io.slave.r.bits.user
       )
   }
+  */
 
   top.io.ctrl <> io.master
   io.slave <> top.io.mem
+  top.io.dma <> io.dma
 
   val (wCounterValue, wCounterWrap) = Counter(io.master.aw.fire(), 4097)
   top.io.ctrl.aw.bits.id := wCounterValue

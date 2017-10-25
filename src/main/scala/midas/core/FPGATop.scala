@@ -9,11 +9,13 @@ import config.{Parameters, Field}
 import scala.collection.mutable.ArrayBuffer
 
 case object MemNastiKey extends Field[NastiParameters]
+case object DMANastiKey extends Field[NastiParameters]
 case object FpgaMMIOSize extends Field[BigInt]
 
 class FPGATopIO(implicit p: Parameters) extends _root_.util.ParameterizedBundle()(p) {
   val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-  val mem  = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
+  val dma = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
+  val mem = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
 }
 
 // Platform agnostic wrapper of the simulation models for FPGA 
@@ -143,6 +145,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     val printWidget = addWidget(new PrintWidget, "PrintWidget")
     printWidget.reset := reset || simReset
     printWidget.io.prints <> simIo.prints
+    printWidget.io.dma    <> io.dma
     createResetQueue(printWidget.io.tReset)
   } else true.B) && (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
@@ -175,6 +178,13 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     "MEM_SIZE_BITS"  -> arb.nastiXSizeBits,
     "MEM_LEN_BITS"   -> arb.nastiXLenBits,
     "MEM_RESP_BITS"  -> arb.nastiXRespBits,
-    "MEM_STRB_BITS"  -> arb.nastiWStrobeBits
+    "MEM_STRB_BITS"  -> arb.nastiWStrobeBits,
+    "DMA_ID_BITS"    -> io.dma.nastiExternal.idBits,
+    "DMA_ADDR_BITS"  -> io.dma.nastiXAddrBits,
+    "DMA_DATA_BITS"  -> io.dma.nastiXDataBits,
+    "DMA_STRB_BITS"  -> io.dma.nastiWStrobeBits,
+
+    "DMA_WIDTH"      -> p(DMANastiKey).dataBits / 8,
+    "DMA_SIZE"       -> log2Up(p(DMANastiKey).dataBits / 8)
   )
 }

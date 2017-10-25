@@ -4,7 +4,8 @@ package widgets
 import midas.core.{NumAsserts, PrintPorts, PrintRecord}
 import chisel3._
 import chisel3.util._
-import config.Parameters
+import config.{Parameters, Field}
+import junctions._
 
 class AssertWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
   val tReset = Flipped(Decoupled(Bool()))
@@ -36,6 +37,7 @@ class AssertWidget(implicit p: Parameters) extends Widget()(p) with HasChannels 
 class PrintWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
   val tReset = Flipped(Decoupled(Bool()))
   val prints = Flipped(Decoupled(new PrintRecord(p(PrintPorts))))
+  val dma = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(midas.core.DMANastiKey) })))
 }
 
 class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
@@ -44,34 +46,60 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
   val cycles = Reg(UInt(64.W))
   val enable = RegInit(false.B)
   val enableAddr = attach(enable, "enable")
-  val bitsAddrs = collection.mutable.ArrayBuffer[Int]()
-  val bitsChunks = collection.mutable.ArrayBuffer[Int]()
-  val deltaAddrs = collection.mutable.ArrayBuffer[Int]()
+  val printAddrs = collection.mutable.ArrayBuffer[Int]()
   val countAddrs = collection.mutable.ArrayBuffer[Int]()
-  val prints = io.prints.bits.elements.zipWithIndex map { case ((_, elem), i) =>
-    val width = elem.getWidth - 1
-    val addrs = collection.mutable.ArrayBuffer[Int]()
-    val printFire = fire && enable && elem(0) && !io.tReset.bits
-    val ready = (0 until width by io.ctrl.nastiXDataBits).zipWithIndex map { case (off, j) =>
-      val queue = Module(new Queue(UInt(io.ctrl.nastiXDataBits.W), p(strober.core.TraceMaxLen)))
-      queue.io.enq.bits := (elem >> 1.U) >> off.U
-      queue.io.enq.valid := printFire
-      addrs += attachDecoupledSource(queue.io.deq, s"prints_${i}_bits_${j}")
-      when(false.B) { printf("%d", queue.io.count) }
-      queue suggestName s"queue_${i}_${j}"
-      queue.io.enq.ready
+  val channelWidth = if (p(HasDMAChannel)) io.dma.nastiXDataBits else io.ctrl.nastiXDataBits
+  val printWidth = (io.prints.bits.elements foldLeft 24)(_ + _._2.getWidth)
+  val valid = (io.prints.bits.elements foldLeft false.B)( _ || _._2(0))
+  val last = RegEnable(Mux(io.tReset.bits, 0.U, cycles), fire && enable && (valid || io.tReset.bits))
+  val data = Cat(io.prints.bits.asUInt, (cycles - last)(23, 0))
+
+  /* FIXME */ if (p(HasDMAChannel)) assert(printWidth <= io.dma.w.bits.getWidth)
+
+  val prints = (0 until printWidth by channelWidth).zipWithIndex map { case (off, i) =>
+    val width = channelWidth min (printWidth - off)
+    val wires = Wire(Decoupled(UInt(width.W)))
+    // val queue = Queue(wires, 8 * 1024)
+    val queue = SeqQueue(wires, 8 * 1024)
+    wires.bits  := data(width + off - 1, off)
+    wires.valid := fire && enable && valid
+    if (countAddrs.isEmpty) {
+      val count = RegInit(0.U(24.W))
+      count suggestName "count"
+      when (wires.fire() === queue.fire()) {
+      }.elsewhen(wires.fire()) {
+        count := count + 1.U
+      }.elsewhen(queue.fire()) {
+        count := count - 1.U
+      }
+      countAddrs += attach(count, "prints_count", ReadOnly)
     }
-    bitsAddrs  += addrs.head
-    bitsChunks += addrs.size
-    // FIXME: too big?
-    val delta = Module(new Queue(UInt(32.W), p(strober.core.TraceMaxLen)))
-    val last  = RegEnable(Mux(io.tReset.bits, 0.U, cycles), fire && enable && (elem(0) || io.tReset.bits))
-    delta suggestName s"delta_${i}"
-    delta.io.enq.bits  := cycles - last
-    delta.io.enq.valid := printFire
-    deltaAddrs += attachDecoupledSource(delta.io.deq, s"prints_${i}_delta")
-    countAddrs += attach(RegNext(delta.io.count), s"prints_${i}_count", ReadOnly)
-    (ready foldLeft delta.io.enq.ready)(_ && _)
+
+    if (p(HasDMAChannel)) {
+      val arQueue   = Queue(io.dma.ar, 10)
+      val readBeats = RegInit(0.U(9.W))
+      readBeats suggestName "readBeats"
+      when(io.dma.r.fire()) {
+        readBeats := Mux(io.dma.r.bits.last, 0.U, readBeats + 1.U)
+      }
+
+      queue.ready := io.dma.r.ready && arQueue.valid
+      io.dma.r.valid := queue.valid && arQueue.valid
+      io.dma.r.bits.data := queue.bits
+      io.dma.r.bits.last := arQueue.bits.len === readBeats
+      io.dma.r.bits.id   := arQueue.bits.id
+      io.dma.r.bits.user := arQueue.bits.user
+      io.dma.r.bits.resp := 0.U
+      arQueue.ready := io.dma.r.fire() && io.dma.r.bits.last
+
+      // No write
+      io.dma.aw.ready := false.B
+      io.dma.w.ready := false.B
+      io.dma.b.valid := false.B
+    } else {
+      printAddrs += attachDecoupledSource(queue, s"prints_data_$i")
+    }
+    wires.ready || !valid
   }
   fire := (prints foldLeft (io.prints.valid && io.tReset.valid))(_ && _)
   io.tReset.ready := fire
@@ -84,11 +112,12 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
     import CppGenerationUtils._
     sb.append(genComment("Print Widget"))
     sb.append(genMacro("PRINTS_NUM", UInt32(p(PrintPorts).size)))
+    sb.append(genMacro("PRINTS_CHUNKS", UInt32(prints.size)))
     sb.append(genMacro("PRINTS_ENABLE", UInt32(base + enableAddr)))
-    sb.append(genArray("PRINTS_BITS_ADDRS", bitsAddrs.toSeq map (x => UInt32(base + x))))
-    sb.append(genArray("PRINTS_BITS_CHUNKS", bitsChunks.toSeq map (UInt32(_))))
-    sb.append(genArray("PRINTS_DELTA_ADDRS", deltaAddrs.toSeq map (x => UInt32(base + x))))
-    sb.append(genArray("PRINTS_COUNT_ADDRS", countAddrs.toSeq map (x => UInt32(base + x))))
+    sb.append(genMacro("PRINTS_COUNT_ADDR", UInt32(base + countAddrs.head)))
+    sb.append(genArray("PRINTS_DATA_ADDRS", printAddrs.toSeq map (x => UInt32(base + x))))
+    sb.append(genArray("PRINTS_WIDTHS", io.prints.bits.elements.toSeq map (x => UInt32(x._2.getWidth))))
+    if (p(HasDMAChannel)) sb.append(genMacro("HAS_DMA_CHANNEL"))
   }
 
   genCRFile()
