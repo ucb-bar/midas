@@ -347,8 +347,6 @@ void tick(
     vc_getScalar(master_b_valid)
   );
 
-  printf("slave_0_w_bits_last before tick is %d\n", vc_getScalar(slave_0_w_bits_last));
-
   slave[0]->tick(
     vcs_rst,
     vc_getScalar(slave_0_ar_valid),
@@ -371,8 +369,6 @@ void tick(
     vc_getScalar(slave_0_r_ready),
     vc_getScalar(slave_0_b_ready)
   );
-
-  printf("slave_0_w_bits_last after tick is %d\n", vc_getScalar(slave_0_w_bits_last));
 
   slave[1]->tick(
     vcs_rst,
