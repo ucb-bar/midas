@@ -142,7 +142,7 @@ data_t simif_emul_t::read(size_t addr) {
   return data;
 }
 
-size_t simif_emul_t::pread(size_t addr, char* data, size_t size) {
+ssize_t simif_emul_t::pread(size_t addr, char* data, size_t size) {
   size_t len = (size - 1) / DMA_WIDTH;
   dma->read_req(addr, DMA_SIZE, len);
   while(!dma->read_resp(data)) {

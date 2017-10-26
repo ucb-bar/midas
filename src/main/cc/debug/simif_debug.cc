@@ -94,7 +94,7 @@ bool simif_t::read_prints() {
       }
     }
 #else
-    if (size_t size = count * DMA_WIDTH) {
+    if (ssize_t size = count * DMA_WIDTH) {
       assert(pread(0, buf.get(), size) == size);
     }
 #endif // HAS_DMA_CHANNEL
@@ -105,7 +105,6 @@ bool simif_t::read_prints() {
       mpz_import(*print, PRINTS_CHUNKS, -1, sizeof(data_t), 0, 0, ((data_t*)buf.get()) + (i * PRINTS_CHUNKS));
 #else
       mpz_import(*print, DMA_WIDTH, -1, sizeof(char), 0, 0, buf.get() + (i * DMA_WIDTH));
-fprintf(stderr, "%s\n", mpz_get_str(NULL, 16, *print));
 #endif
       print_state.prints.push(print);
     }
