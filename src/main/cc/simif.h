@@ -53,12 +53,11 @@ class simif_t
 #endif
 #ifdef ENABLE_PRINT
   public:
-    bool read_prints();
-    bool parse_print_vars();
+    size_t read_prints();
     print_state_t* get_print_state() { return &print_state; }
 
   private:
-    void show_prints();
+    void show_prints(size_t count);
     void init_prints(int argc, char** argv);
     print_state_t print_state;
 #endif
@@ -73,8 +72,8 @@ class simif_t
       detect_assert();
 #endif
 #ifdef ENABLE_PRINT
-      while(print_state.enable && read_prints()) {
-        show_prints();
+      if (print_state.enable) {
+        show_prints(read_prints());
       }
 #endif
       return read(MASTER(DONE));

@@ -95,8 +95,9 @@ private[passes] class AssertPass(
               // Field(child, Default, p.tpe)
               case BundleType(fs) => fs map (f => f.copy(name=s"${child}_${f.name}")) }
             }) ++ (prints(m.name).zipWithIndex map { case (print, idx) =>
-              val width = (print.args foldLeft 1)((res, arg) => res + bitWidth(arg.tpe).toInt)
-              Field(s"print_${idx}", Default, UIntType(IntWidth(width)))
+              val total = (print.args foldLeft 0)((res, arg) => res + bitWidth(arg.tpe).toInt)
+              val width = 8 * ((total - 1) / 8 + 1)
+              Field(s"print_${idx}", Default, UIntType(IntWidth(width + 1)))
             })
           )
           val port = Port(NoInfo, namespace.newName("midasPrints"), Output, tpe)

@@ -74,94 +74,60 @@ void print_format(const char* fmt, print_vars_t* vars) {
   assert(k == vars->data.size());
 }
 
-static const size_t BUF_SIZE = 512 / 8;
-static const size_t BUF_DEPTH = 8 * 1024;
-static std::unique_ptr<char> buf(new char[BUF_DEPTH * BUF_SIZE]()); 
-
-bool simif_t::read_prints() {
-  bool done;
-  size_t count, total_count = 0;
+size_t simif_t::read_prints() {
   // uint64_t start_time = timestamp();
-  do {
-    count = read(PRINTS_COUNT_ADDR);
+  size_t count = read(PRINTS_COUNT_ADDR);
 #ifndef HAS_DMA_CHANNEL
-    size_t offset = 0;
-    for (size_t i = 0 ; i < count ; i++) {
-      for (size_t k = 0 ; k < PRINTS_CHUNKS ; k++) {
-        data_t bits = read(PRINTS_DATA_ADDRS[k]);
-        std::copy((char*)&bits, (char*)&bits + sizeof(data_t), buf.get() + offset);
-        offset += sizeof(data_t);
-      }
+  size_t offset = 0;
+  for (size_t i = 0 ; i < count ; i++) {
+    for (size_t k = 0 ; k < PRINTS_CHUNKS ; k++) {
+      data_t bits = read(PRINTS_DATA_ADDRS[k]);
+      std::copy((char*)&bits, (char*)&bits + sizeof(data_t), print_state.prints + offset);
+      offset += sizeof(data_t);
     }
-#else
-    if (ssize_t size = count * DMA_WIDTH) {
-      assert(pread(0, buf.get(), size) == size);
-    }
-#endif // HAS_DMA_CHANNEL
-    for (size_t i = 0 ; i < count ; i++) {
-      mpz_t* print = (mpz_t*)malloc(sizeof(mpz_t));
-      mpz_init(*print);
-#ifndef HAS_DMA_CHANNEL
-      mpz_import(*print, PRINTS_CHUNKS, -1, sizeof(data_t), 0, 0, ((data_t*)buf.get()) + (i * PRINTS_CHUNKS));
-#else
-      mpz_import(*print, DMA_WIDTH, -1, sizeof(char), 0, 0, buf.get() + (i * DMA_WIDTH));
-#endif
-      print_state.prints.push(print);
-    }
-    total_count += count;
-  } while(count > 0);
-
-  return total_count > 0;
-}
-
-bool simif_t::parse_print_vars() {
-  if (print_state.prints.empty()) return false;
-
-  mpz_t* print = print_state.prints.front();
-  // delta = *print & delta_mask
-  mpz_t delta;
-  mpz_init(delta);
-  mpz_and(delta, *print, print_state.delta_mask);
-  print_state.cycles += mpz_get_ui(delta);
-  mpz_clear(delta);
-  // *print = *print >> 24
-  mpz_fdiv_q_2exp(*print, *print, 24);
-
-  for (size_t id = 0 ; id < PRINTS_NUM ; id++) {
-    if (mpz_get_ui(*print) & 0x1) {
-      // print_var_t* vars = parse_print_vars(*print, k);
-      size_t off = 1, size = print_state.widths[id].size();
-      print_vars_t* vars = new print_vars_t;
-      for (size_t k = 0 ; k < size ; k++) {
-        mpz_t* var = (mpz_t*)malloc(sizeof(mpz_t));
-        mpz_t* mask = print_state.masks[id]->data[k];
-        mpz_init(*var);
-        // *var = *print >> off
-        mpz_fdiv_q_2exp(*var, *print, off);
-        // *var = *var & *mask
-        mpz_and(*var, *var, *mask);
-        vars->data.push_back(var);
-        off += print_state.widths[id][k];
-      }
-      print_state.values[id].push(vars);
-    }
-    // *print = *print >> PRINTS_WIDTHS[id]
-    mpz_fdiv_q_2exp(*print, *print, PRINTS_WIDTHS[id]);
   }
-  mpz_clear(*print);
-  print_state.prints.pop();
+#else
+  if (ssize_t size = count * DMA_WIDTH) {
+    assert(pread(0, print_state.prints, size) == size);
+  }
+#endif
 
-  return true;
+  return count;
 }
 
-void simif_t::show_prints() {
-  while (parse_print_vars()) { 
+#ifndef HAS_DMA_CHANNEL
+const size_t PRINT_SIZE = PRINTS_CHUNKS * sizeof(data_t);
+#else
+const size_t PRINT_SIZE = DMA_WIDTH;
+#endif
+
+void simif_t::show_prints(size_t count) {
+  for (size_t i = 0 ; i < count ; i++) {
+    char* data = print_state.prints + i * PRINT_SIZE;
+    size_t delta = (data[2] << 16) | (data[1] << 8) | data[0];
+    print_state.cycles += delta;
+    size_t offset = 4;
     for (size_t id = 0 ; id < PRINTS_NUM ; id++) {
-      while (!print_state.values[id].empty()) {
-        print_vars_t* vars = print_state.values[id].front();
-        print_format(print_state.formats[id].c_str(), vars);
-        print_state.values[id].pop();
+      if ((data[3] >> id) & 0x1) {
+        mpz_t print;
+        mpz_init(print);
+        mpz_import(print, print_state.sizes[id], -1, sizeof(char), 0, 0, &data[offset]);
+        print_vars_t vars;
+        size_t size = print_state.widths[id].size();
+        for (size_t k = 0 ; k < size ; k++) {
+          mpz_t* var = (mpz_t*)malloc(sizeof(mpz_t));
+          mpz_t* mask = print_state.masks[id]->data[k];
+          mpz_init(*var);
+          // *var = print & *mask
+          mpz_and(*var, print, *mask);
+          vars.data.push_back(var);
+          // print = print >> width
+          mpz_fdiv_q_2exp(print, print, print_state.widths[id][k]);
+        }
+        print_format(print_state.formats[id].c_str(), &vars);
+        mpz_clear(print);
       }
+      offset += print_state.sizes[id];
     }
   }
 }
@@ -185,7 +151,6 @@ void simif_t::init_prints(int argc, char** argv) {
 
   std::fill(print_state.names.begin(), print_state.names.end(), std::vector<std::string>());
   std::fill(print_state.widths.begin(), print_state.widths.end(), std::vector<size_t>());
-  std::fill(print_state.values.begin(), print_state.values.end(), std::queue<print_vars_t*>());
 
   std::string line;
   size_t i = 0;
@@ -215,6 +180,7 @@ void simif_t::init_prints(int argc, char** argv) {
         assert(token_state == PRINT_NAME);
         size_t size = print_state.widths[i].size();
         assert(size == print_state.names[i].size());
+        size_t sum = 0;
         for (size_t k = 0 ; k < size ; k++) {
            mpz_t* mask = (mpz_t*)malloc(sizeof(mpz_t));
            size_t width = print_state.widths[i][k];
@@ -224,7 +190,9 @@ void simif_t::init_prints(int argc, char** argv) {
            mpz_mul_2exp(*mask, *mask, width);
            mpz_sub_ui(*mask, *mask, 1);
            print_state.masks[i]->data.push_back(mask);
+           sum += width; 
         }
+        print_state.sizes[i] = (sum - 1) / 8 + 1;
         i++;
         line_state = PRINT_FMT;
         break;
