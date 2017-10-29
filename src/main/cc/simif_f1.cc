@@ -116,6 +116,7 @@ void simif_f1_t::fpga_setup() {
 
 
 simif_f1_t::~simif_f1_t() {
+    close(edma_fd);
     fpga_shutdown();
 }
 
