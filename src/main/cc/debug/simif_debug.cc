@@ -25,7 +25,7 @@ void simif_t::detect_assert() {
     std::cerr << msgs[read(ASSERTWIDGET(id))];
     std::cerr << " at cycle: " << assert_cycle << std::endl;
 #ifdef ENABLE_SNAPSHOT
-    trace_count = assert_cycle - (t - delta);
+    trace_count = assert_cycle - snap_cycle;
 #endif
     finish();
     exit(EXIT_FAILURE);

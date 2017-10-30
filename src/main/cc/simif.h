@@ -34,7 +34,6 @@ class simif_t
     // simulation information
     bool log;
     bool pass;
-    size_t delta;
     uint64_t t;
     uint64_t fail_t;
     // random numbers
@@ -138,6 +137,7 @@ class simif_t
     size_t last_sample_id;
     std::string sample_file;
     uint64_t sample_cycle;
+    uint64_t snap_cycle;
 
     size_t trace_count;
 
@@ -158,6 +158,14 @@ class simif_t
     size_t tracelen;
     sample_t* read_snapshot(bool load = false);
     sample_t* read_traces(sample_t* s);
+
+  public:
+    uint64_t get_snap_cycle() const {
+      return snap_cycle;
+    }
+    void set_trace_count(uint64_t count) {
+      trace_count = count;
+    }
 #endif
 };
 

@@ -17,6 +17,7 @@ void simif_t::init_sampling(int argc, char** argv) {
   sample_count = 0;
   sample_time = 0;
   sample_cycle = 0;
+  snap_cycle = -1ULL;
   tracelen = TRACE_MAX_LEN;
   trace_count = 0;
 
