@@ -16,7 +16,6 @@ struct print_vars_t {
 
 struct print_state_t {
   bool enable;
-  uint64_t cycles;
   char* prints;
   std::array<std::string,              PRINTS_NUM> formats;
   std::array<std::vector<std::string>, PRINTS_NUM> names;
@@ -26,7 +25,6 @@ struct print_state_t {
   print_vars_t* masks[PRINTS_NUM];
 
   print_state_t() {
-    cycles = 0;
     prints = new char[512 * 1024]();
     for (size_t i = 0 ; i < PRINTS_NUM ; i++) {
       masks[i] = new print_vars_t;

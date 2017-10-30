@@ -104,11 +104,10 @@ const size_t PRINT_SIZE = DMA_WIDTH;
 void simif_t::show_prints(size_t count) {
   for (size_t i = 0 ; i < count ; i++) {
     char* data = print_state.prints + i * PRINT_SIZE;
-    size_t delta = (data[2] << 16) | (data[1] << 8) | data[0];
-    print_state.cycles += delta;
-    size_t offset = 4;
+    uint64_t cycle = ((uint64_t*)data)[0];
+    size_t offset = 9;
     for (size_t id = 0 ; id < PRINTS_NUM ; id++) {
-      if ((data[3] >> id) & 0x1) {
+      if ((data[8] >> id) & 0x1) {
         mpz_t print;
         mpz_init(print);
         mpz_import(print, print_state.sizes[id], -1, sizeof(char), 0, 0, &data[offset]);
@@ -124,6 +123,7 @@ void simif_t::show_prints(size_t count) {
           // print = print >> width
           mpz_fdiv_q_2exp(print, print, print_state.widths[id][k]);
         }
+        fprintf(stderr, "[cycle: %d] ", cycle);
         print_format(print_state.formats[id].c_str(), &vars);
         mpz_clear(print);
       }

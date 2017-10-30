@@ -51,12 +51,11 @@ class PrintWidget(implicit p: Parameters) extends Widget()(p) with HasChannels {
   val printAddrs = collection.mutable.ArrayBuffer[Int]()
   val countAddrs = collection.mutable.ArrayBuffer[Int]()
   val channelWidth = if (p(HasDMAChannel)) io.dma.nastiXDataBits else io.ctrl.nastiXDataBits
-  val printWidth = (io.prints.bits.elements foldLeft 32)(_ + _._2.getWidth - 1)
+  val printWidth = (io.prints.bits.elements foldLeft 72)(_ + _._2.getWidth - 1)
   val valid = (io.prints.bits.elements foldLeft false.B)( _ || _._2(0))
-  val last = RegEnable(Mux(io.tReset.bits, 0.U, cycles), fire && enable && (valid || io.tReset.bits))
   val ps = io.prints.bits.elements.toSeq map (_._2 >> 1)
   val vs = io.prints.bits.elements.toSeq map (_._2(0))
-  val data = Cat(Cat(ps.reverse), Cat(vs.reverse) | 0.U(8.W), (cycles - last)(23, 0))
+  val data = Cat(Cat(ps.reverse), Cat(vs.reverse) | 0.U(8.W), cycles)
   /* FIXME */ if (p(HasDMAChannel)) assert(printWidth <= io.dma.w.bits.getWidth)
 
   val prints = (0 until printWidth by channelWidth).zipWithIndex map { case (off, i) =>
