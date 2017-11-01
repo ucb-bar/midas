@@ -14,8 +14,6 @@ import mdf.macrolib.SRAMMacro
 import AddDaisyChains._
 
 object AddDaisyChains {
-  private[passes] val debugRegs =
-    (Seq("events", "wdata", "executed") map (x => s"debug_${x}"))
   private[passes] val deadRegs = (
     // Issue Slots, Functional Units, Register Reads
     (Seq("allocate_brtag", "br_prediction_is_br_or_jalr", "brob_idx", "csr_addr",
@@ -89,9 +87,9 @@ class AddDaisyChains(
         case _ =>
       }
       case ChainType.Regs => s match {
-        case s: DefRegister if !deadRegs(s.name) && !(debugRegs exists (s.name contains _))=>
+        case s: DefRegister if !deadRegs(s.name) =>
           chains += s
-        case s: DefMemory if s.readLatency == 0 && !bigRegFile(s) && !(debugRegs exists (s.name contains _)) =>
+        case s: DefMemory if s.readLatency == 0 && !bigRegFile(s) =>
           chains += s
         case _ =>
       }
@@ -133,9 +131,9 @@ class AddDaisyChains(
                               hasChain: ChainModSet)
                               (implicit chainType: ChainType.Value) = {
     def sumWidths(stmts: Statements): Int = (stmts foldLeft 0){
-      case (sum, s: DefRegister) if !deadRegs(s.name) && !(debugRegs exists (s.name contains _)) =>
+      case (sum, s: DefRegister) if !deadRegs(s.name) =>
         sum + bitWidth(s.tpe).toInt
-      case (sum, s: DefMemory) if s.readLatency == 0 && !bigRegFile(s) && !(debugRegs exists (s.name contains _)) =>
+      case (sum, s: DefMemory) if s.readLatency == 0 && !bigRegFile(s) =>
         sum + bitWidth(s.dataType).toInt * s.depth
       case (sum, s: DefMemory) if s.readLatency == 1 =>
         sum + bitWidth(s.dataType).toInt * (s.readers.size + s.readwriters.size)
