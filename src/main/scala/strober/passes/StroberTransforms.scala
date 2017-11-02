@@ -36,14 +36,14 @@ object StroberMetaData {
   }
 
   def apply(c: Circuit) = {
-    val meta = new StroberMetaData
+    val meta = new StroberMetaData(c.modules)
     val blackboxes = (c.modules collect { case m: ExtModule => m.name }).toSet
     c.modules map collectChildrenMod(meta, blackboxes)
     meta
   }
 }
 
-class StroberMetaData {
+class StroberMetaData(mods: Seq[DefModule]) {
   type ChainMap = HashMap[String, ArrayBuffer[ir.Statement]]
   type ChildMods = HashMap[String, LinkedHashSet[String]]
   type ChildInsts = HashMap[String, ArrayBuffer[String]]
@@ -53,6 +53,7 @@ class StroberMetaData {
   val childInsts = new ChildInsts
   val instModMap = new InstModMap
   val chains = (ChainType.values.toList map (_ -> new ChainMap)).toMap
+  val isBOOM = mods exists (_.name == "BoomCore") // hack
 }
 
 object preorder {

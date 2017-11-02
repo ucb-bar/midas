@@ -87,7 +87,7 @@ class AddDaisyChains(
         case _ =>
       }
       case ChainType.Regs => s match {
-        case s: DefRegister if !deadRegs(s.name) =>
+        case s: DefRegister if !meta.isBOOM || !deadRegs(s.name) =>
           chains += s
         case s: DefMemory if s.readLatency == 0 && !bigRegFile(s) =>
           chains += s
@@ -131,7 +131,7 @@ class AddDaisyChains(
                               hasChain: ChainModSet)
                               (implicit chainType: ChainType.Value) = {
     def sumWidths(stmts: Statements): Int = (stmts foldLeft 0){
-      case (sum, s: DefRegister) if !deadRegs(s.name) =>
+      case (sum, s: DefRegister) if !meta.isBOOM || !deadRegs(s.name) =>
         sum + bitWidth(s.tpe).toInt
       case (sum, s: DefMemory) if s.readLatency == 0 && !bigRegFile(s) =>
         sum + bitWidth(s.dataType).toInt * s.depth
@@ -472,9 +472,10 @@ class AddDaisyChains(
     val chainNum = 1
     // Filter children who have daisy chains
     val childrenWithChains = meta.childInsts(m.name) filter (x =>
-      hasChain(meta.instModMap(x, m.name)) &&
+      hasChain(meta.instModMap(x, m.name)) && (
+      !meta.isBOOM ||
       !(m.name == "RocketTile" && x == "fpuOpt") &&
-      !(m.name == "NonBlockingDCache_dcache" && x == "dtlb")
+      !(m.name == "NonBlockingDCache_dcache" && x == "dtlb"))
     )
     val invalids = childrenWithChains flatMap (c => Seq(
       IsInvalid(NoInfo, childDaisyPort(c)("in")),

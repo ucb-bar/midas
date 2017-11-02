@@ -74,7 +74,7 @@ class DumpChains(
                   sum + width
                 })
               }
-            case s: DefRegister if !deadRegs(s.name) =>
+            case s: DefRegister if !meta.isBOOM || !deadRegs(s.name) =>
               val name = verilogRenameN(s.name)
               val width = bitWidth(s.tpe).toInt
               chainFile write s"$id $path.$name $width -1\n"
@@ -87,6 +87,7 @@ class DumpChains(
       case _ =>
     }
     meta.childInsts(mod) filter (x =>
+       !meta.isBOOM ||
        !(mod == "RocketTile" && x == "fpuOpt") &&
        !(mod == "NonBlockingDCache_dcache" && x == "dtlb")
     ) foreach (child => loop(chainFile, meta.instModMap(child, mod), s"${path}.${child}")(chainType))
