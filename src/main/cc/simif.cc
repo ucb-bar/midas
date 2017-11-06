@@ -54,6 +54,7 @@ void simif_t::init(int argc, char** argv, bool log) {
 #ifdef ENABLE_PRINT
   init_prints(argc, argv);
 #endif
+  sim_start_time = timestamp();
 }
 
 void simif_t::target_reset(int pulse_start, int pulse_length) {
@@ -77,8 +78,16 @@ int simif_t::finish() {
 #ifdef ENABLE_SNAPSHOT
   finish_sampling();
 #endif
-
   fprintf(stderr, "Runs %llu cycles\n", cycles());
+
+  double sim_time = diff_secs(timestamp(), sim_start_time);
+  double sim_speed = ((double)cycles()) / (sim_time * 1000.0);
+  if (sim_speed > 1000.0) {
+    fprintf(stderr, "time elapsed: %.1f s, simulation speed = %.2f MHz\n", sim_time, sim_speed / 1000.0);
+  } else {
+    fprintf(stderr, "time elapsed: %.1f s, simulation speed = %.2f KHz\n", sim_time, sim_speed);
+  }
+
   fprintf(stderr, "[%s] %s Test", pass ? "PASS" : "FAIL", TARGET_NAME);
   if (!pass) { fprintf(stdout, " at cycle %llu", fail_t); }
   fprintf(stderr, "\nSEED: %ld\n", seed);

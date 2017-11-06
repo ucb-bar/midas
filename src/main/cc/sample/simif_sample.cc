@@ -61,8 +61,6 @@ void simif_t::init_sampling(int argc, char** argv) {
       bits_id + (size_t)OUT_TR_BITS_FIELD_NUMS[id] :
       trace_ready_valid_bits(NULL, false, id, bits_id);
   }
-
-  if (profile) sim_start_time = timestamp();
 }
 
 void simif_t::finish_sampling() {
@@ -96,8 +94,7 @@ void simif_t::finish_sampling() {
   fprintf(stderr, "Sample Count: %zu\n", sample_count);
   if (profile) {
     double sim_time = diff_secs(timestamp(), sim_start_time);
-    fprintf(stderr, "Simulation Time: %.3f s, Sample Time: %.3f s\n", 
-                    sim_time, diff_secs(sample_time, 0));
+    fprintf(stderr, "Sample Time: %.3f s\n", diff_secs(sample_time, 0));
   }
 }
 
