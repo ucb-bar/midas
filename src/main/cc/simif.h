@@ -163,6 +163,12 @@ class simif_t
     uint64_t get_snap_cycle() const {
       return snap_cycle;
     }
+    uint64_t get_sample_cycle() const {
+      return sample_cycle;
+    }
+    void set_sample_cycle(uint64_t cycle) {
+      sample_cycle = cycle;
+    }
     void set_trace_count(uint64_t count) {
       trace_count = count;
     }

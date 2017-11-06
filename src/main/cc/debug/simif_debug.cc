@@ -28,7 +28,7 @@ void simif_t::detect_assert() {
     trace_count = assert_cycle - snap_cycle;
 #endif
     finish();
-    exit(EXIT_FAILURE);
+    throw assert_cycle;
   }
 }
 #endif // ENABLE_DEBUG
@@ -75,7 +75,6 @@ void print_format(const char* fmt, print_vars_t* vars) {
 }
 
 size_t simif_t::read_prints() {
-  // uint64_t start_time = timestamp();
   size_t count = read(PRINTS_COUNT_ADDR);
 #ifndef HAS_DMA_CHANNEL
   size_t offset = 0;
