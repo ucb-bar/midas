@@ -39,6 +39,7 @@ class simif_t
     // random numbers
     uint64_t seed;
     std::mt19937_64 gen;
+    midas_time_t sim_start_time;
 
     inline void take_steps(size_t n, bool blocking) {
       write(MASTER(STEP), n);
@@ -145,7 +146,6 @@ class simif_t
     bool profile;
     size_t sample_count;
     midas_time_t sample_time;
-    midas_time_t sim_start_time;
 
     void init_sampling(int argc, char** argv);
     void finish_sampling();
