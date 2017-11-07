@@ -175,16 +175,17 @@ void simif_t::load_mem(std::string filename) {
   const size_t chunk = MEM_DATA_BITS / 4;
   size_t addr = 0;
   std::string line;
+  mpz_t data;
+  mpz_init(data);
   while (std::getline(file, line)) {
     assert(line.length() % chunk == 0);
     for (int j = line.length() - chunk ; j >= 0 ; j -= chunk) {
-      mpz_t data;
-      mpz_init(data);
       mpz_set_str(data, line.substr(j, chunk).c_str(), 16);
       write_mem(addr, data);
       addr += chunk / 2;
     }
   }
+  mpz_clear(data);
   file.close();
   fprintf(stdout, "[loadmem] done\n");
 }
