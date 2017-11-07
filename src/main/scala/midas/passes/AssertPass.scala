@@ -61,7 +61,11 @@ private[passes] class AssertPass(
     prints(m.name) = new Prints
 
     def getChildren(ports: collection.mutable.Map[String, Port]) = {
-      (meta.childInsts(m.name) foldRight Seq[(String, Port)]())(
+      (meta.childInsts(m.name) filter (x =>
+        !meta.isBOOM || 
+        !(m.name == "RocketTile" && x == "fpuOpt") &&
+        !(m.name == "NonBlockingDCache_dcache" && x == "dtlb")
+      ) foldRight Seq[(String, Port)]())(
         (x, res) => ports get meta.instModMap(x -> m.name) match {
           case None    => res
           case Some(p) => res :+ (x -> p)
@@ -135,7 +139,11 @@ private[passes] class AssertPass(
           writer write "0\n"
           assertNum += 1
         }
-        meta.childInsts(mod) foreach { child =>
+        meta.childInsts(mod) filter (x =>
+         !meta.isBOOM ||
+         !(mod == "RocketTile" && x == "fpuOpt") &&
+         !(mod == "NonBlockingDCache_dcache" && x == "dtlb")
+        ) foreach { child =>
           dump(writer, meta, meta.instModMap(child, mod), s"${path}.${child}")
         }
       case DumpPrints =>
@@ -146,7 +154,11 @@ private[passes] class AssertPass(
           writer write s"\n"
           printNum += 1
         }
-        meta.childInsts(mod).reverse foreach { child =>
+        meta.childInsts(mod).reverse filter (x =>
+         !meta.isBOOM ||
+         !(mod == "RocketTile" && x == "fpuOpt") &&
+         !(mod == "NonBlockingDCache_dcache" && x == "dtlb")
+        ) foreach { child =>
           dump(writer, meta, meta.instModMap(child, mod), s"${path}.${child}")
         }
     }
