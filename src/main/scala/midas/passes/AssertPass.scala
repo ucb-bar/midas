@@ -128,22 +128,27 @@ private[passes] class AssertPass(
   private var printNum = 0
   def dump(writer: Writer, meta: StroberMetaData, mod: String, path: String)(implicit t: DumpType) {
     t match {
-      case DumpAsserts => asserts(mod).values.toSeq sortWith (_._1 < _._1) foreach { case (idx, _) =>
-        writer write s"[id: $assertNum, module: $mod, path: $path]\n"
-        writer write (messages(mod)(idx) replace ("""\n""", "\n"))
-        writer write "0\n"
-        assertNum += 1
-      }
-      case DumpPrints => prints(mod) foreach { print =>
-        writer write """%s""".format(print.string.serialize)
-        writer write s"\n"
-        writer write (print.args map (arg => s"${path}.${arg.serialize} ${bitWidth(arg.tpe)}") mkString " ")
-        writer write s"\n"
-        printNum += 1
-      }
-    }
-    meta.childInsts(mod) foreach { child =>
-      dump(writer, meta, meta.instModMap(child, mod), s"${path}.${child}")
+      case DumpAsserts =>
+        asserts(mod).values.toSeq sortWith (_._1 < _._1) foreach { case (idx, _) =>
+          writer write s"[id: $assertNum, module: $mod, path: $path]\n"
+          writer write (messages(mod)(idx) replace ("""\n""", "\n"))
+          writer write "0\n"
+          assertNum += 1
+        }
+        meta.childInsts(mod) foreach { child =>
+          dump(writer, meta, meta.instModMap(child, mod), s"${path}.${child}")
+        }
+      case DumpPrints =>
+        prints(mod) foreach { print =>
+          writer write """%s""".format(print.string.serialize)
+          writer write s"\n"
+          writer write (print.args map (arg => s"${path}.${arg.serialize} ${bitWidth(arg.tpe)}") mkString " ")
+          writer write s"\n"
+          printNum += 1
+        }
+        meta.childInsts(mod).reverse foreach { child =>
+          dump(writer, meta, meta.instModMap(child, mod), s"${path}.${child}")
+        }
     }
   }
 
