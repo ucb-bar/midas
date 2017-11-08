@@ -9,7 +9,7 @@
 #include <inttypes.h>
 #include <gmp.h>
 
-enum SAMPLE_INST_TYPE { SIGNALS, CYCLE, LOAD, FORCE, POKE, STEP, EXPECT, COUNT };
+enum SAMPLE_INST_TYPE { SIGNALS, CYCLE, STATE_LOAD, FORCE, POKE, STEP, EXPECT, COUNT };
 #ifdef ENABLE_SNAPSHOT
 enum { IN_TR = CHAIN_NUM,
        OUT_TR,
@@ -46,7 +46,7 @@ struct load_t: sample_inst_t {
   }
   std::ostream& dump(std::ostream &os) const {
     char* value_str = mpz_get_str(NULL, 16, *value);
-    os << LOAD << " " << type << " " << id << " " << value_str << " " << idx << std::endl;
+    os << STATE_LOAD << " " << type << " " << id << " " << value_str << " " << idx << std::endl;
     free(value_str);
     return os;
   }
