@@ -13,7 +13,7 @@ case object FpgaMMIOSize extends Field[BigInt]
 
 class FPGATopIO(implicit p: Parameters) extends freechips.rocketchip.util.ParameterizedBundle()(p) {
   val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-  val NICmaster = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
+  val NICmaster = Vec(4, Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) }))))
   val mem  = Vec(4, new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
 }
 
@@ -128,8 +128,10 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     }
   }
 
+
   // Instantiate endpoint widgets
   var mem_model_index=0
+  var nic_index=0
   defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {
@@ -146,7 +148,8 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       }
       // HACKS
       if (widget.HAS_PCIS_MASTER) {
-        widget.io.pcisMASTER <> io.NICmaster
+        widget.io.pcisMASTER <> io.NICmaster(nic_index)
+        nic_index += 1
       }
 
       channels2Port(widget.io.hPort, endpoint(i)._2)
@@ -176,3 +179,4 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     "MEM_STRB_BITS"  -> arb(0).nastiWStrobeBits
   )
 }
+

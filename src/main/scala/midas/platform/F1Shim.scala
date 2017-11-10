@@ -10,7 +10,7 @@ import freechips.rocketchip.config.{Parameters, Field}
 
 class F1ShimIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
   val master = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(MasterNastiKey) })))
-  val NICmaster = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
+  val NICmaster = Vec(4, Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) }))))
   val slave  = Vec(4, new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) })))
 }
 
@@ -168,7 +168,10 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
     case (slave_i, top_mem_i) => slave_i <> top_mem_i
   }
 
-  top.io.NICmaster <> io.NICmaster
+  //top.io.NICmaster <> io.NICmaster
+  io.NICmaster.zip(top.io.NICmaster).foreach {
+    case (nic_i, top_nic_i) => nic_i <> top_nic_i
+  }
 
   val (wCounterValue, wCounterWrap) = Counter(io.master.aw.fire(), 4097)
   top.io.ctrl.aw.bits.id := wCounterValue
