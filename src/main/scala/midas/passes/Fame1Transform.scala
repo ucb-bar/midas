@@ -23,6 +23,7 @@ private[passes] class Fame1Transform(json: Option[java.io.File]) extends firrtl.
   override def name = "[midas] Fame1 Transforms"
   type Enables = collection.mutable.HashMap[String, Boolean]
   type Statements = collection.mutable.ArrayBuffer[Statement]
+  type BBClocks = collection.mutable.ArrayBuffer[String]
   private lazy val srams = json.foldLeft(Map.empty[String, SRAMMacro])({ case (sramMap, file) =>
     val str = io.Source.fromFile(file).mkString
     val srams = readMDFFromString(str).get collect { case x: SRAMMacro => x }
@@ -52,11 +53,38 @@ private[passes] class Fame1Transform(json: Option[java.io.File]) extends firrtl.
     s map collect(ens)
   }
 
+  private def isExtModule(m: DefModule): Boolean= m match {
+    case m: Module => false
+    case m: ExtModule => true
+    case _ => false
+  }
+
+  //def clock_gated(s: Statement){
+   def print_ports(ports: Seq[Port]): BBClocks = {
+     ports.map(println(_))
+     val clk_ports = ports.filter(_.tpe == ClockType).filter(_.direction == Input).map(_.name) 
+     println(clk_ports)     
+     clk_ports.to[collection.mutable.ArrayBuffer]
+     //collect.mutable.ArrayBuffer(clk_ports: _*)
+     //clk_ports.toBuffer
+  }
+
   private def connect(ens: Enables,
-                      stmts: Statements)
+                      stmts: Statements, bb_clks: BBClocks, moduleMap: Map[String, DefModule])
                       (s: Statement): Statement = s match {
-    case s: WDefInstance if !(srams contains s.module) =>
-      Block(Seq(s,
+
+    case s: WDefInstance if (moduleMap.keySet.exists(_==s.module) && isExtModule(moduleMap(s.module)) && !(srams contains s.module)) =>{
+      val b = Block(Seq(s ))
+
+      println("Matching ExtModule")
+      val m = moduleMap(s.module)
+      val clks = print_ports(m.ports).map( x => wsub(wref(s.name),x).serialize)
+      bb_clks ++= clks
+      println(b)
+      println(bb_clks)
+      b
+    }
+    case s: WDefInstance if !(srams contains s.module) => Block(Seq(s,
         Connect(NoInfo, wsub(wref(s.name), "targetFire"), targetFire),
         Connect(NoInfo, wsub(wref(s.name), "daisyReset"), daisyReset)
       ))
@@ -70,7 +98,11 @@ private[passes] class Fame1Transform(json: Option[java.io.File]) extends firrtl.
       s.copy(en = and(s.en, targetFire))
     case s: Connect => s.loc match {
       case e: WSubField => ens get e.serialize match {
-        case None => s
+        case None => if (bb_clks.contains(e.serialize)) {
+          println("Match Expression")
+          println(s.expr)
+            s.copy(expr = castRhs( ClockType, and(castRhs(BoolType, s.expr), targetFire)))
+          } else s
         case Some(false) =>
           s.copy(expr = and(s.expr, targetFire))
         case Some(true) => // inverted port
@@ -78,14 +110,17 @@ private[passes] class Fame1Transform(json: Option[java.io.File]) extends firrtl.
       }
       case _ => s
     }
-    case s => s map connect(ens, stmts)
-  }
 
-  protected def transform(m: DefModule): DefModule = {
+    case s => s map connect(ens, stmts, bb_clks, moduleMap)
+  }
+  
+
+  protected def transform(moduleMap: Map[String, DefModule])(m: DefModule) : DefModule = {
     val ens = new Enables
     val stmts = new Statements
+    val bb_clks = new BBClocks
     if (srams contains m.name) m
-    else m map collect(ens) map connect(ens, stmts) match {
+    else m map collect(ens) map connect(ens, stmts, bb_clks, moduleMap) match {
       case m: Module =>
         m.copy(ports = m.ports ++ Seq(targetFirePort, daisyResetPort),
                body = Block(m.body +: stmts))
@@ -93,7 +128,14 @@ private[passes] class Fame1Transform(json: Option[java.io.File]) extends firrtl.
     }
   }
 
-  def run(c: Circuit) = c copy (modules = c.modules map transform)
+  //def run(c: Circuit) = c copy (modules = c.modules map transform)
+  def run(c: Circuit) = {
+    
+    val moduleMap = c.modules.map(m => m.name -> m).toMap
+    println("moduleMap")
+    c.copy (modules = c.modules map transform(moduleMap))
+    //c.copy (modules = c.modules map transform)
+  }
 }
 
 // This variety of fame1 transform is apply to subtrees of the instance hiearchy
@@ -168,14 +210,16 @@ class ModelFame1Transform(f1Modules: Map[String, String], f1ModuleSuffix: String
 
     moduleMap(c.main) match {
       case m: Module if f1Modules.keys.toSeq.contains(c.main) =>
-        c.copy(modules = c.modules map transform)
+        c.copy(modules = c.modules map transform(moduleMap))
+        //c.copy(modules = c.modules map transform)
       case m: Module =>
         getF1Modules(false, m.body)
         val fame1ChildModules = c.modules filter modsToDup.contains map
           renameModules(f1ModuleSuffix) map renameInstances
         val fame1RootModules = f1Modules.keys map moduleMap map renameInstances
         val fame0Modules = c.modules filter modsToKeep.contains map bindTargetFires
-        val fame1TransformedModules = (fame1ChildModules ++ fame1RootModules).toList map transform
+        //val fame1TransformedModules = (fame1ChildModules ++ fame1RootModules).toList map transform
+        val fame1TransformedModules = (fame1ChildModules ++ fame1RootModules).toList map transform(moduleMap)
         c.copy(modules = Seq(m.copy()) ++ fame0Modules ++ fame1TransformedModules)
       case _ => throw new RuntimeException("Should not have an ExtModule as top.")
     }
