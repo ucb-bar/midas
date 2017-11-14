@@ -150,6 +150,7 @@ class simif_t
     void init_sampling(int argc, char** argv);
     void finish_sampling();
     void reservoir_sampling(size_t n);
+    void deterministic_sampling(size_t n);
     size_t trace_ready_valid_bits(
       sample_t* sample, bool poke, size_t id, size_t bits_id);
     inline void save_sample();

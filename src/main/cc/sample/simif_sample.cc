@@ -308,4 +308,22 @@ void simif_t::reservoir_sampling(size_t n) {
   }
   if (trace_count < tracelen) trace_count += n;
 }
+
+void simif_t::deterministic_sampling(size_t n) {
+  if ((t + n) - sample_cycle <= tracelen || sample_cycle <= t) {
+    sample_count++;
+    snap_cycle = t;
+    fprintf(stderr, "Snapshot at %llu\n", (unsigned long long)t);
+    trace_count = std::min(n, tracelen);
+    if (last_sample) {
+      save_sample();
+    } else {
+      // flush trace buffer
+      read_traces(NULL);
+    }
+    trace_count = 0;
+    last_sample_id = last_sample ? last_sample_id + 1 : 0;
+    last_sample = read_snapshot();
+  }
+}
 #endif

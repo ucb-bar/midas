@@ -146,16 +146,8 @@ void simif_t::step(int n, bool blocking) {
 #ifdef ENABLE_SNAPSHOT
   if (sample_cycle == 0) {
     reservoir_sampling(n);
-  } else if ((t + n) - sample_cycle <= tracelen) {
-    snap_cycle = t;
-    fprintf(stderr, "Snapshot at %llu\n", (unsigned long long)t);
-    // flush trace buffer
-    trace_count = std::min((size_t)(t + n), tracelen);
-    read_traces(NULL);
-    trace_count = 0;
-    // take a snaphsot
-    last_sample = read_snapshot();
-    last_sample_id = 0;
+  } else {
+    deterministic_sampling(n);
   }
 #endif
   // take steps
