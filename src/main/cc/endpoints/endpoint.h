@@ -15,11 +15,11 @@ public:
 
 protected:
   AddressMap addr_map;
-  inline void write(size_t addr, data_t data) {
+  inline void write_m(size_t addr, data_t data) {
     sim->write(addr, data);
   }
   
-  inline data_t read(size_t addr) {
+  inline data_t read_m(size_t addr) {
     return sim->read(addr);
   }
 
