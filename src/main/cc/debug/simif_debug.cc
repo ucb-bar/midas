@@ -86,11 +86,7 @@ size_t simif_t::read_prints() {
     }
   }
 #else
-  size_t last_count = 0;
-  while (count < 8192 && count != last_count) {
-    last_count = count;
-    count = read(PRINTS_COUNT_ADDR);
-  }
+  count = count < 8192 ? 0 : count;
   if (ssize_t size = count * DMA_WIDTH) {
     assert(pread(0, print_state.prints, size) == size);
   }

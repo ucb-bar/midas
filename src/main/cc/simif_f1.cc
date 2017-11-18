@@ -159,6 +159,8 @@ ssize_t simif_f1_t::pread(size_t addr, char* data, size_t size) {
 #ifdef SIMULATION_XSIM
   return -1; // TODO
 #else
+  ::pwrite(edma_fd, data, size, 0x0); // fake write to make edma work...
+  __sync_synchronize();
   return ::pread(edma_fd, data, size, 0x0);
 #endif
 }
