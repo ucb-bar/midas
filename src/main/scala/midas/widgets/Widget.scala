@@ -133,10 +133,15 @@ abstract class Widget(implicit p: Parameters) extends Module {
     sb.append(CppGenerationUtils.genMacro(s"${name}(x)", s"${name}_ ## x"))
   }
 
+  // Widget name which will show up in all caps in the header file.
+  def widgetNamePrefix(): String = {
+    wName.getOrElse(name).toUpperCase
+  }
+
   def genHeader(base: BigInt, sb: StringBuilder){
     require(_finalized, "Must build Widgets with their companion object")
     headerComment(sb)
-    crRegistry.genHeader(wName.getOrElse(name).toUpperCase, base, sb)
+    crRegistry.genHeader(widgetNamePrefix(), base, sb)
   }
 
   def printCRs = crRegistry.printCRs
