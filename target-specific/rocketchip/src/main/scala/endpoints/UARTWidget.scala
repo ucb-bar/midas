@@ -19,7 +19,7 @@ class SimUART extends Endpoint {
     case channel: UARTPortIO => channel.txd.dir == OUTPUT
     case _ => false
   }
-  def widget(p: Parameters) = new UARTWidget()(p)
+  def widget(channel: Option[chisel3.Data] = None)(p: Parameters) = new UARTWidget()(p)
   override def widgetName = "UARTWidget"
 }
 
