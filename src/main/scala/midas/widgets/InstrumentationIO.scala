@@ -26,7 +26,7 @@ import scala.language.dynamics // for transparent wrapping of Bundle
 
 class InstrumentationIO(bundle: Bundle) extends Record with Dynamic {
   if (bundle.elements.isEmpty) {
-    throw new IllegalArgumentException(s"Cannot use a bundle (${bundle}) with no elements. Note: if you are using an anonymous Bundle, create a named bundle and used that instead. (See chisel3 #721)")
+    throw new IllegalArgumentException(s"Cannot use a bundle (${bundle}) with no elements. Note: if you are using an anonymous Bundle, create a named bundle and use that instead. (See chisel3 #721)")
   }
 
   override def toString: String = "InstrumentationIO(" + s"${bundle}" + ")"
