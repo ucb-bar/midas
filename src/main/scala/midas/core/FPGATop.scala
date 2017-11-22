@@ -93,21 +93,30 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
         b.elements.toList foreach { case (name, wire) =>
           loop(target.elements(name), wire)
         }
+      case (target: Record, r: Record) =>
+        r.elements.toList foreach { case (name, wire) =>
+          loop(target.elements(name), wire)
+        }
       case (target: Vec[_], v: Vec[_]) =>
         assert(target.size == v.size)
         (target.toSeq zip v.toSeq) foreach loop
-      case (target: Bits, wire: Bits) if wire.dir == INPUT =>
-        val channels = simIo.getIns(wire)
-        channels.zipWithIndex foreach { case (in, i) =>
-          in.bits  := target >> UInt(i * simIo.channelWidth)
-          in.valid := port.fromHost.hValid || simResetNext
+      case (target: Bits, wire: Bits) => wire.dir match {
+          case INPUT => {
+            val channels = simIo.getIns(wire)
+            channels.zipWithIndex foreach { case (in, i) =>
+              in.bits  := target >> UInt(i * simIo.channelWidth)
+              in.valid := port.fromHost.hValid || simResetNext
+            }
+            ready ++= channels map (_.ready)
+          }
+          case OUTPUT => {
+            val channels = simIo.getOuts(wire)
+            target := Cat(channels.reverse map (_.bits))
+            channels foreach (_.ready := port.toHost.hReady)
+            valid ++= channels map (_.valid)
+          }
+          case _ => throw new IllegalArgumentException(s"Wire '${wire.name}' has unknown direction '${wire.dir}'")
         }
-        ready ++= channels map (_.ready)
-      case (target: Bits, wire: Bits) if wire.dir == OUTPUT =>
-        val channels = simIo.getOuts(wire)
-        target := Cat(channels.reverse map (_.bits))
-        channels foreach (_.ready := port.toHost.hReady)
-        valid ++= channels map (_.valid)
     }
 
     loop(port.hBits -> wires)
@@ -133,13 +142,14 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
         case (_: SimMemIO, None) => s"NastiWidget_$i"
         case _ => s"${endpoint.widgetName}_$i"
       }
-      val widget = addWidget(endpoint.widget(p), widgetName)
+      val endpointChannel = endpoint(i)._2
+      val widget = addWidget(endpoint.widget(Some(endpointChannel))(p), widgetName)
       widget.reset := reset || simReset
       widget match {
         case model: MemModel => arb.io.master(i) <> model.io.host_mem
         case _ =>
       }
-      channels2Port(widget.io.hPort, endpoint(i)._2)
+      channels2Port(widget.io.hPort, endpointChannel)
       // each widget should have its own reset queue
       val resetQueue = Module(new Queue(Bool(), 4))
       resetQueue.reset := reset || simReset

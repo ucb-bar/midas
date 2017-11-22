@@ -20,7 +20,7 @@ class SimSerialIO extends Endpoint {
     case channel: SerialIO => channel.out.valid.dir == OUTPUT
     case _ => false
   }
-  def widget(p: Parameters) = new SerialWidget()(p)
+  def widget(channel: Option[chisel3.Data] = None)(p: Parameters) = new SerialWidget()(p)
   override def widgetName = "SerialWidget"
 }
 

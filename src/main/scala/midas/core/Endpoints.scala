@@ -17,7 +17,11 @@ trait Endpoint {
   protected val channels = ArrayBuffer[(String, Record)]()
   protected val wires = HashSet[Bits]()
   def matchType(data: Data): Boolean
-  def widget(p: Parameters): EndpointWidget
+
+  // When creating the widget, optionally pass it the channel type as well.
+  // Some widgets are parametrized per every channel, and so require this info.
+  def widget(channel: Option[Data] = None)(p: Parameters): EndpointWidget
+
   def widgetName: String = getClass.getSimpleName
   final def size = channels.size
   final def apply(wire: Bits) = wires(wire)
@@ -30,7 +34,7 @@ trait Endpoint {
 }
 
 abstract class SimMemIO extends Endpoint {
-  def widget(p: Parameters) = { 
+  def widget(channel: Option[Data] = None)(p: Parameters) = {
     val param = p alterPartial ({ case NastiKey => p(MemNastiKey) })
     (p(MemModelKey): @unchecked) match {
       case Some(modelGen) => modelGen(param)
@@ -38,7 +42,7 @@ abstract class SimMemIO extends Endpoint {
     }
   }
 }
- 
+
 class SimNastiMemIO extends SimMemIO {
   def matchType(data: Data) = data match {
     case channel: NastiIO => channel.w.valid.dir == OUTPUT
@@ -55,5 +59,5 @@ class SimAXI4MemIO extends SimMemIO {
 
 case class EndpointMap(endpoints: Seq[Endpoint]) {
   def get(data: Data) = endpoints find (_ matchType data)
-  def ++(x: EndpointMap) = EndpointMap(endpoints ++ x.endpoints) 
+  def ++(x: EndpointMap) = EndpointMap(endpoints ++ x.endpoints)
 }

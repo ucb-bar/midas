@@ -19,7 +19,7 @@ object SimUtils {
     val inputs = ArrayBuffer[(Bits, String)]()
     val outputs = ArrayBuffer[(Bits, String)]()
     def loop(name: String, data: Data): Unit = data match {
-      case b: Bundle =>
+      case b: Record => // Support Records more broadly (including Bundles)
         b.elements foreach {case (n, e) => loop(s"${name}_${n}", e)}
       case v: Vec[_] =>
         v.zipWithIndex foreach {case (e, i) => loop(s"${name}_${i}", e)}
