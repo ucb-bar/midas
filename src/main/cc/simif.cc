@@ -89,7 +89,7 @@ int simif_t::finish() {
   }
 
   fprintf(stderr, "[%s] %s Test", pass ? "PASS" : "FAIL", TARGET_NAME);
-  if (!pass) { fprintf(stdout, " at cycle %llu", fail_t); }
+  if (!pass) { fprintf(stderr, " at cycle %llu", fail_t); }
   fprintf(stderr, "\nSEED: %ld\n", seed);
 
   return pass ? EXIT_SUCCESS : EXIT_FAILURE;

@@ -27,6 +27,8 @@ void simif_t::detect_assert() {
 #ifdef ENABLE_SNAPSHOT
     trace_count = assert_cycle - snap_cycle;
 #endif
+    pass = false;
+    fail_t = assert_cycle;
     finish();
     throw assert_cycle;
   }
