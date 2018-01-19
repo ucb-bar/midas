@@ -64,11 +64,11 @@ abstract class NastiWidgetBase(implicit p: Parameters) extends MemModel {
     // memory model; i'm too lazy to properly handle this here.
     val targetReset = fire && tReset
     targetReset suggestName "targetReset"
-    arBuf.reset := reset || targetReset
-    awBuf.reset := reset || targetReset
-    rBuf.reset := reset || targetReset
-    bBuf.reset := reset || targetReset
-    wBuf.reset := reset || targetReset
+    arBuf.reset := reset.toBool || targetReset
+    awBuf.reset := reset.toBool || targetReset
+    rBuf.reset := reset.toBool || targetReset
+    bBuf.reset := reset.toBool || targetReset
+    wBuf.reset := reset.toBool || targetReset
 
     // Request
     tNasti.ar.ready    := arBuf.io.enq.ready && rCycleReady
@@ -109,7 +109,7 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
   val (fire, cycles, targetReset) = elaborate(stall)
 
   deltaBuf.io.deq.ready := stall
-  when(reset || targetReset) {
+  when(reset.toBool || targetReset) {
     delta := 0.U
   }.elsewhen(deltaBuf.io.deq.valid && stall) {
     delta := deltaBuf.io.deq.bits
@@ -117,7 +117,7 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
     delta := delta - 1.U
   }
 
-  when(reset || targetReset) {
+  when(reset.toBool || targetReset) {
     readCount := 0.U
   }.elsewhen(tNasti.ar.fire() && fire) {
     readCount := readCount + 1.U
@@ -125,7 +125,7 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
     readCount := readCount - 1.U
   }
 
-  when(reset || targetReset) {
+  when(reset.toBool || targetReset) {
     writeCount := 0.U
   }.elsewhen(tNasti.w.fire() && tNasti.w.bits.last && fire) {
     writeCount := writeCount + 1.U
