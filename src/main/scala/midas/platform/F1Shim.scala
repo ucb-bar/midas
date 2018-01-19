@@ -164,7 +164,7 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
 
   top.io.ctrl <> io.master
   io.slave <> top.io.mem
-  top.io.NICmaster <> io.NICmaster
+  // top.io.NICmaster <> io.NICmaster
 
   val (wCounterValue, wCounterWrap) = Counter(io.master.aw.fire(), 4097)
   top.io.ctrl.aw.bits.id := wCounterValue

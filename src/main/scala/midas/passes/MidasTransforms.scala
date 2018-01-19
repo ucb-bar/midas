@@ -3,7 +3,6 @@ package passes
 
 import java.io.{File, FileWriter}
 
-import chisel3.Record
 import chisel3.experimental.ChiselAnnotation
 import firrtl._
 import firrtl.annotations._
@@ -33,7 +32,7 @@ object MidasAnnotation {
 
 private[midas] class MidasTransforms(
     dir: File,
-    targetPorts: Record)
+    io: Seq[chisel3.Data])
     (implicit param: freechips.rocketchip.config.Parameters) extends Transform {
   def inputForm = LowForm
   def outputForm = LowForm
@@ -51,7 +50,7 @@ private[midas] class MidasTransforms(
         firrtl.passes.RemoveEmpty,
         new Fame1Transform(Some(lib getOrElse json)),
         new strober.passes.StroberTransforms(dir, lib getOrElse json),
-        new SimulationMapping(targetPorts),
+        new SimulationMapping(io),
         new PlatformMapping(state.circuit.main, dir))
       (xforms foldLeft state)((in, xform) =>
         xform runTransform in).copy(form=outputForm)

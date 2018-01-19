@@ -13,14 +13,14 @@ import firrtl.passes.memlib._
 import barstools.macros._
 
 // Compiler for Midas Transforms
-private class MidasCompiler(dir: File, targetPorts: Record)(implicit param: Parameters) 
+private class MidasCompiler(dir: File, io: Seq[Data])(implicit param: Parameters) 
     extends firrtl.Compiler {
   def emitter = new firrtl.LowFirrtlEmitter
   def transforms = getLoweringTransforms(firrtl.ChirrtlForm, firrtl.MidForm) ++ Seq(
     new InferReadWrite,
     new ReplSeqMem) ++
     getLoweringTransforms(firrtl.MidForm, firrtl.LowForm) ++ Seq(
-    new passes.MidasTransforms(dir, targetPorts))
+    new passes.MidasTransforms(dir, io))
 }
 
 // Compilers to emit proper verilog
@@ -30,34 +30,13 @@ private class VerilogCompiler extends firrtl.Compiler {
     new firrtl.LowFirrtlOptimization)
 }
 
-// A convenience class that populates a Record with a port list, returned by Module.getPorts 
-class TargetPortRecord(portList: Seq[Port]) extends Record {
-  val elements = ListMap((for (port <- portList) yield {
-      (port.id.instanceName -> port.id.chiselCloneType)
-    }):_*)
-  override def cloneType = new TargetPortRecord(portList).asInstanceOf[this.type]
-}
-
-object TargetPortRecord {
-  def apply(mod: chisel3.experimental.RawModule, excludes: Seq[String] = Seq.empty) = {
-    // In the default case, exclude all clocks, and boots with the name reset (TODO: fix reset).
-    val portList = mod.getPorts flatMap {
-      case Port(id: Clock, _)  => None
-      case Port(id: Bool, _) if id.instanceName == "reset"  => None
-      case Port(id, _) if excludes contains id.instanceName => None
-      case keptPort => Some(keptPort)
-    }
-    new TargetPortRecord(portList)
-  }
-}
-
 object MidasCompiler {
   // Generates the verilog and memory map for a MIDAS simulation
   // Accepts: An elaborated chisel circuit, record that mirrors its I/O,
   // an output directory, and technology library
   def apply(
       chirrtl: Circuit,
-      targetPorts: Record,
+      io: Seq[Data],
       dir: File,
       lib: Option[File])
      (implicit p: Parameters): Circuit = {
@@ -68,9 +47,9 @@ object MidasCompiler {
       ReplSeqMemAnnotation(s"-c:${chirrtl.main}:-o:$conf"),
       passes.MidasAnnotation(chirrtl.main, conf, json, lib),
       MacroCompilerAnnotation(chirrtl.main, MacroCompilerAnnotation.Params(
-        json.toString, lib map (_.toString), CostMetric.default, true))))
+        json.toString, lib map (_.toString), CostMetric.default, MacroCompilerAnnotation.Synflops))))
     val writer = new java.io.StringWriter
-    val midas = new MidasCompiler(dir, targetPorts) compile (
+    val midas = new MidasCompiler(dir, io) compile (
       firrtl.CircuitState(chirrtl, firrtl.ChirrtlForm, Some(annotations)), writer)
     val verilog = new FileWriter(new File(dir, s"FPGATop.v"))
     val result = new VerilogCompiler compile (
@@ -80,13 +59,14 @@ object MidasCompiler {
   }
 
   // Unlike above, elaborates the target locally, before constructing the target IO Record.
-  def apply[T <: chisel3.experimental.RawModule](w: => T, dir: File, libFile: Option[File])
+  def apply[T <: chisel3.core.UserModule](
+       w: => T, dir: File, libFile: Option[File] = None)
       (implicit p: Parameters): Circuit = {
     dir.mkdirs
     lazy val target = w
     val chirrtl = firrtl.Parser.parse(chisel3.Driver.emit(() => target))
-    val targetPorts = TargetPortRecord(target)
-    apply(chirrtl, targetPorts, dir, libFile)
+    val io = target.getPorts map (_.id)
+    apply(chirrtl, io, dir, libFile)
   }
 }
 
