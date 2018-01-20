@@ -21,7 +21,7 @@ private class Compiler(conf: File, json: File, lib: File, macros: File, paths: F
 }
 
 object Compiler {
-  def apply(chirrtl: Circuit, io: chisel3.Data, dir: File, lib: Option[File]): Circuit = {
+  def apply(chirrtl: Circuit, io: Seq[chisel3.Data], dir: File, lib: Option[File]): Circuit = {
     dir.mkdirs
     val confFile = new File(dir, s"${chirrtl.main}.conf")
     val jsonFile = new File(dir, s"${chirrtl.main}.macros.json")
@@ -31,7 +31,7 @@ object Compiler {
       InferReadWriteAnnotation(chirrtl.main),
       ReplSeqMemAnnotation(s"-c:${chirrtl.main}:-o:$confFile"),
       MacroCompilerAnnotation(chirrtl.main, MacroCompilerAnnotation.Params(
-        jsonFile.toString, lib map (_.toString), CostMetric.default, false))))
+        jsonFile.toString, lib map (_.toString), CostMetric.default, MacroCompilerAnnotation.Synflops))))
     val verilog = new FileWriter(new File(dir, s"${chirrtl.main}.v"))
     val result = new Compiler(confFile, jsonFile, lib getOrElse jsonFile, macroFile, pathFile) compile (
       CircuitState(chirrtl, ChirrtlForm, Some(annotations)), verilog)
@@ -40,9 +40,11 @@ object Compiler {
     result.circuit
   }
 
-  def apply[T <: chisel3.Module](w: => T, dir: File, lib: Option[File] = None): Circuit = {
+  def apply[T <: chisel3.core.UserModule](
+      w: => T, dir: File, lib: Option[File] = None): Circuit = {
     lazy val dut = w
     val chirrtl = Parser.parse(chisel3.Driver.emit(() => dut))
-    apply(chirrtl, dut.io, dir, lib)
+    val io = dut.getPorts map (_.id)
+    apply(chirrtl, io, dir, lib)
   }
 }
