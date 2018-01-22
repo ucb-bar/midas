@@ -2,7 +2,7 @@ package midas
 package core
 
 import scala.collection.immutable.ListMap
-import scala.collection.mutable.{ArrayBuffer, HashSet}
+import scala.collection.mutable.ArrayBuffer
 
 // from rocketchip
 import junctions.NastiIO
@@ -198,7 +198,7 @@ class SimWrapperIO(io: TargetBoxIO)
 
 class TargetBoxIO(targetIo: Seq[Data]) extends Record {
   val elements = ListMap() ++ (targetIo map (port => port.instanceName -> port.chiselCloneType))
-  def reset = (elements collect { case (_, r: Reset) => r.toBool } foldLeft true.B)(_ || _)
+  def resets = elements collect { case (_, r: Reset) => r }
   def clocks = elements collect { case (_, c: Clock) => c }
   def cloneType = new TargetBoxIO(targetIo).asInstanceOf[this.type]
 }
@@ -226,6 +226,8 @@ class SimWrapper(targetIo: Seq[Data])
 
   target.io.clocks foreach (_ := clock)
 
+  val targetResets = ArrayBuffer[UInt]()
+
   /*** Wire Channels ***/
   val wireInChannels: Seq[WireChannel] = io.wireInputs flatMap genWireChannels
   val wireOutChannels: Seq[WireChannel] = io.wireOutputs flatMap genWireChannels
@@ -249,6 +251,13 @@ class SimWrapper(targetIo: Seq[Data])
       (0 until getChunks(port)) map { off =>
         val width = scala.math.min(channelWidth, port.getWidth - off * channelWidth)
         val channel = Module(new WireChannel(width))
+        // FIXME: it's not working due to Chisel internals
+        /* port match {
+          case _: Reset =>
+            targetResets += channel.io.out.bits
+          case _ =>
+        } */
+        if (name == "reset") targetResets += channel.io.out.bits // FIXME: it's awkward
         channel suggestName s"WireChannel_${name}_${off}"
         channel.io.trace := DontCare
         channel
@@ -270,6 +279,8 @@ class SimWrapper(targetIo: Seq[Data])
       }
       off + getChunks(wire)
     }
+
+  val targetReset = (targetResets foldLeft 0.U)(_ | _)
 
   /*** ReadyValid Channels ***/
   val readyValidInChannels: Seq[ReadyValidChannel[_]] = io.readyValidInputs map genReadyValidChannel
@@ -299,7 +310,7 @@ class SimWrapper(targetIo: Seq[Data])
         case ActualDirection.Input => io <> channel.io.deq.target
         case ActualDirection.Output => channel.io.enq.target <> io
       }
-      channel.io.targetReset.bits := target.io.reset
+      channel.io.targetReset.bits := targetReset
       channel.io.targetReset.valid := fire
       channel
     }
@@ -333,7 +344,7 @@ class SimWrapper(targetIo: Seq[Data])
   // Cycles for debug
   val cycles = Reg(UInt(64.W))
   when (fire) {
-    cycles := Mux(target.io.reset, UInt(0), cycles + UInt(1))
+    // cycles := Mux(target.io.reset, UInt(0), cycles + UInt(1))
     when(false.B) { printf("%d", cycles) }
   }
 } 
