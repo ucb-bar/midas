@@ -163,7 +163,7 @@ class AddDaisyChains(
         Connect(NoInfo, wsub(chainRef(), "reset"), wref("daisyReset")),
         // <daisy_chain>.io.stall <- not(targetFire)
         Connect(NoInfo, wsub(chainIo(), "stall"), not(wref("targetFire"))),
-        // <daiy_port>.out <- <daisy_chain>.io.dataIo.out
+        // <daisy_port>.out <- <daisy_chain>.io.dataIo.out
         Connect(NoInfo, daisyPort("out"), chainDataIo("out"))
       )
       hasChain += m.name
@@ -347,12 +347,14 @@ class AddDaisyChains(
         insertSRAMChains(m, namespace, netlist, repl, chainMods, hasChain)
     }
     val chainNum = 1
+    // Initialize all daisy ports
+    val invalids = meta.childInsts(m.name) filterNot (c =>
+      srams contains meta.instModMap(c, m.name)) flatMap (c => Seq(
+      IsInvalid(NoInfo, childDaisyPort(c)("in")),
+      IsInvalid(NoInfo, childDaisyPort(c)("out"))))
     // Filter children who have daisy chains
     val childrenWithChains = meta.childInsts(m.name) filter (
       x => hasChain(meta.instModMap(x, m.name)))
-    val invalids = childrenWithChains flatMap (c => Seq(
-      IsInvalid(NoInfo, childDaisyPort(c)("in")),
-      IsInvalid(NoInfo, childDaisyPort(c)("out"))))
     val connects = (childrenWithChains foldLeft (None: Option[String], Seq[Connect]())){
       case ((None, stmts), child) if !hasChain(m.name) =>
         // <daisy_port>.out <- <child>.<daisy_port>.out

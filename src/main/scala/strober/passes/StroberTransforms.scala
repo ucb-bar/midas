@@ -47,7 +47,7 @@ private class StroberMetaData {
   type ChainMap = HashMap[String, ArrayBuffer[ir.Statement]]
   type ChildMods = HashMap[String, LinkedHashSet[String]]
   type ChildInsts = HashMap[String, ArrayBuffer[String]]
-  type InstModMap = HashMap[(String, String), String]
+  type InstModMap = HashMap[(String, String), String] // (child, parent) -> module
 
   val childMods = new ChildMods
   val childInsts = new ChildInsts
