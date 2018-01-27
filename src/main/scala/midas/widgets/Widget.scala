@@ -6,6 +6,8 @@ import chisel3._
 import chisel3.util._
 import chisel3.core.ActualDirection
 import chisel3.core.DataMirror.directionOf
+import chisel3.experimental.ChiselAnnotation
+import firrtl.transforms.DedupModules
 import junctions._
 import freechips.rocketchip.config.{Parameters, Field}
 
@@ -116,6 +118,7 @@ abstract class Widget(implicit p: Parameters) extends Module {
     crFile.io.mcr := DontCare
     crFile.io.nasti <> io.ctrl
     crRegistry.bindRegs(crFile.io.mcr)
+    annotate(ChiselAnnotation(crFile, classOf[DedupModules], "nodedup!"))
   }
 
   // Returns a word addresses
