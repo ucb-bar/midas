@@ -68,6 +68,7 @@ object ScanRegister {
 class SatUpDownCounterIO(val n: Int) extends Bundle {
   val inc = Input(Bool())
   val dec = Input(Bool())
+  val set = Input(Valid(UInt(log2Up(n+1).W)))
   val max = Input(UInt(log2Up(n+1).W))
   val value = Output(UInt())
   val full = Output(Bool())
@@ -85,7 +86,9 @@ class SatUpDownCounter(val n: Int) extends Module {
   io.full := value >= io.max
   io.empty := value === 0.U
 
-  when (io.inc && ~io.dec && ~io.full) {
+  when (io.set.valid) {
+    io.value := io.set.bits
+  }.elsewhen (io.inc && ~io.dec && ~io.full) {
     value := value + 1.U
   }.elsewhen(~io.inc && io.dec && ~io.empty){
     value := value - 1.U
@@ -95,9 +98,11 @@ class SatUpDownCounter(val n: Int) extends Module {
 object SatUpDownCounter {
   def apply(n: Int): SatUpDownCounterIO = {
     val c = (Module(new SatUpDownCounter(n))).io
-    c.max := UInt(n)
+    c.max := n.U
     c.inc := false.B
+    c.set.valid := false.B
     c.dec := false.B
+    c.set.bits := DontCare
     c
   }
 }
@@ -429,4 +434,21 @@ object SkidRegister {
   }
 }
 
+class IdentityModule[T <: Data](gen: T) extends Module
+{
+  val io = IO(new Bundle {
+    val in = Flipped(gen.cloneType)
+    val out = gen.cloneType
+  })
 
+  io.out <> io.in
+}
+
+object IdentityModule
+{
+  def apply[T <: Data](x: T): T = {
+    val identity = Module(new IdentityModule(x))
+    identity.io.in := x
+    identity.io.out
+  }
+}
