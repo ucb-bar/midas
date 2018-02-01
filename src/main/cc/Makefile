@@ -50,7 +50,7 @@ $(OUT_DIR)/$(DESIGN).chain:
 	$(if $(wildcard $(GEN_DIR)/$(DESIGN).chain),cp $(GEN_DIR)/$(DESIGN).chain $@,)
 
 override CXXFLAGS += -I$(midas_dir) -I$(util_dir) $(foreach f, $(DRIVER), -I$(dir $(f)))
-override LDFLAGS := $(LDFLAGS) -L$(GEN_DIR) -lstdc++ -lpthread -lgmp
+override LDFLAGS := $(LDFLAGS) -L$(GEN_DIR) -lstdc++ -lpthread -lgmp 
 
 design_v = $(GEN_DIR)/$(shim).v
 driver_h = $(foreach t, $(DRIVER), $(wildcard $(dir $(t))/*.h))
