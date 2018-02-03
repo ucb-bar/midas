@@ -46,5 +46,5 @@ class DaisyController(daisyIF: DaisyBundle)(implicit p: Parameters) extends Widg
     sb.append(genArray("CHAIN_ADDR", chains map (t => UInt32(base + addrs(t)._2.head))))
   }
 
-  genCRFile()
+  genMMIOFile()
 }

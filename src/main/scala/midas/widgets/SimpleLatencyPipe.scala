@@ -181,10 +181,10 @@ class SimpleLatencyPipe(implicit val p: Parameters) extends NastiWidgetBase {
     attach(setBits, "LLC_SET_BITS", WriteOnly)
     attach(blockBits, "LLC_BLOCK_BITS", WriteOnly)
   }
-  genCRFile()
+  genMMIOFile()
 
   override def genHeader(base: BigInt, sb: StringBuilder) {
     super.genHeader(base, sb)
-    crRegistry.genArrayHeader(getWName.toUpperCase, base, sb)
+    mmioRegistry.genArrayHeader(getWName.toUpperCase, base, sb)
   }
 }

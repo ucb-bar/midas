@@ -21,9 +21,9 @@ class LoadMemWidget(hKey: Field[NastiParameters])(implicit p: Parameters) extend
   // prefix h -> host memory we are writing to
   // prefix c -> control nasti interface who is the master of this unit
   val hParams = new NastiParams()(p alterPartial ({ case NastiKey => p(hKey) }))
-  val cParams = new NastiParams()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) }))
+  val cParams = new NastiParams()(p alterPartial ({ case NastiKey => p(MMIONastiKey) }))
 
-  val cWidth = p(CtrlNastiKey).dataBits
+  val cWidth = p(MMIONastiKey).dataBits
   val hWidth = p(hKey).dataBits
   val size = hParams.bytesToXSize(UInt(hWidth/8))
   val widthRatio = hWidth/cWidth
@@ -62,7 +62,7 @@ class LoadMemWidget(hKey: Field[NastiParameters])(implicit p: Parameters) extend
   io.toSlaveMem.r.ready := rDataQ.io.in.ready
   rDataQ.io.in.valid := io.toSlaveMem.r.valid
 
-  genCRFile()
+  genMMIOFile()
 
   override def genHeader(base: BigInt, sb: StringBuilder) {
     super.genHeader(base, sb)

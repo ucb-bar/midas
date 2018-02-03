@@ -13,9 +13,9 @@ class IOTraceWidgetIO(
      readyValidInputs: Seq[(String, ReadyValidIO[Data])],
      readyValidOutputs: Seq[(String, ReadyValidIO[Data])])
     (implicit p: Parameters) extends WidgetIO()(p) {
-  val traceLen = Output(UInt(ctrl.nastiXDataBits.W))
-  val wireIns = Flipped(Vec(wireInNum, Decoupled(UInt(ctrl.nastiXDataBits.W))))
-  val wireOuts = Flipped(Vec(wireOutNum, Decoupled(UInt(ctrl.nastiXDataBits.W))))
+  val traceLen = Output(UInt(mmio.nastiXDataBits.W))
+  val wireIns = Flipped(Vec(wireInNum, Decoupled(UInt(mmio.nastiXDataBits.W))))
+  val wireOuts = Flipped(Vec(wireOutNum, Decoupled(UInt(mmio.nastiXDataBits.W))))
   val readyValidIns = Flipped(new ReadyValidTraceRecord(readyValidInputs))
   val readyValidOuts = Flipped(new ReadyValidTraceRecord(readyValidOutputs))
 }
@@ -78,16 +78,16 @@ class IOTraceWidget(
   val bitsOutFields = readyValidOuts map getFields
 
   val bitsInChunks = readyValidIns map { case (name, rv) =>
-    name -> ((rv.bits.getWidth - 1) / io.ctrl.nastiXDataBits + 1) }
+    name -> ((rv.bits.getWidth - 1) / io.mmio.nastiXDataBits + 1) }
   val bitsOutChunks = readyValidOuts map { case (name, rv) =>
-    name -> ((rv.bits.getWidth - 1) / io.ctrl.nastiXDataBits + 1) }
+    name -> ((rv.bits.getWidth - 1) / io.mmio.nastiXDataBits + 1) }
 
   def genBitsBuffers[T <: Data](arg: ((String, Int), ReadyValidTraceIO[T])) = {
     val ((name, chunks), rv) = arg
-    val buffers = Seq.fill(chunks)(Module(new Queue(UInt(io.ctrl.nastiXDataBits.W), 2)))
+    val buffers = Seq.fill(chunks)(Module(new Queue(UInt(io.mmio.nastiXDataBits.W), 2)))
     rv.bits.ready := (buffers.zipWithIndex foldLeft true.B){ case (ready, (buffer, i)) =>
-      val high = (((i + 1) * io.ctrl.nastiXDataBits) min rv.bits.bits.getWidth) - 1
-      val low = i * io.ctrl.nastiXDataBits
+      val high = (((i + 1) * io.mmio.nastiXDataBits) min rv.bits.bits.getWidth) - 1
+      val low = i * io.mmio.nastiXDataBits
       buffer suggestName s"${name}_bits_buffer_${i}"
       buffer.io.enq.bits := rv.bits.bits.asUInt()(high, low)
       buffer.io.enq.valid := rv.bits.fire()
@@ -155,5 +155,5 @@ class IOTraceWidget(
     sb.append(genMacro("TRACE_MAX_LEN", UInt32(BigInt(p(strober.core.TraceMaxLen)))))
   }
 
-  genCRFile()
+  genMMIOFile()
 }

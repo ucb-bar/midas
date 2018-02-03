@@ -13,34 +13,33 @@ import freechips.rocketchip.config.{Parameters, Field}
 
 import scala.collection.mutable.{HashMap, ArrayBuffer}
 
-case object CtrlNastiKey extends Field[NastiParameters]
+case object MMIONastiKey extends Field[NastiParameters]
 
 // Just NASTI, but pointing at the right key.
 class WidgetMMIO(implicit p: Parameters) extends NastiIO()(p)
   with HasNastiParameters
 
 object WidgetMMIO {
-  def apply()(implicit p: Parameters): WidgetMMIO = {
-    new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) }))
-  }
+  def apply()(implicit p: Parameters) =
+    new WidgetMMIO()(p alterPartial ({ case NastiKey => p(MMIONastiKey) }))
 }
 
 // All widgets must implement this interface
 abstract class WidgetIO(implicit p: Parameters) extends ParameterizedBundle()(p){
-  val ctrl = Flipped(WidgetMMIO())
+  val mmio = Flipped(WidgetMMIO())
 }
 
 abstract class Widget(implicit p: Parameters) extends Module {
   private var _finalized = false
-  protected val crRegistry = new MCRFileMap()
-  def numRegs = crRegistry.numRegs
+  protected val mmioRegistry = new MCRFileMap()
+  def numRegs = mmioRegistry.numRegs
 
   override def io: WidgetIO
 
   val customSize: Option[BigInt] = None
   // Default case we set the region to be large enough to hold the CRs
   lazy val memRegionSize = customSize.getOrElse(
-    BigInt(1 << log2Up(numRegs * (io.ctrl.nastiXDataBits/8))))
+    BigInt(1 << log2Up(numRegs * (io.mmio.nastiXDataBits/8))))
 
   protected var wName: Option[String] = None
   private def setWidgetName(n: String) {
@@ -51,7 +50,7 @@ abstract class Widget(implicit p: Parameters) extends Module {
   }
 
   def attach(reg: Data, name: String, permissions: Permissions = ReadWrite): Int = {
-    crRegistry.allocate(RegisterEntry(reg, name, permissions))
+    mmioRegistry.allocate(RegisterEntry(reg, name, permissions))
   }
 
   // Recursively binds the IO of a module:
@@ -75,11 +74,11 @@ abstract class Widget(implicit p: Parameters) extends Module {
   }
 
   def attachDecoupledSink(channel: DecoupledIO[UInt], name: String): Int = {
-    crRegistry.allocate(DecoupledSinkEntry(channel, name))
+    mmioRegistry.allocate(DecoupledSinkEntry(channel, name))
   }
 
   def attachDecoupledSource(channel: DecoupledIO[UInt], name: String): Int = {
-    crRegistry.allocate(DecoupledSourceEntry(channel, name))
+    mmioRegistry.allocate(DecoupledSourceEntry(channel, name))
   }
 
   def genAndAttachQueue(channel: DecoupledIO[UInt], name: String, depth: Int = 2): DecoupledIO[UInt] = {
@@ -94,7 +93,7 @@ abstract class Widget(implicit p: Parameters) extends Module {
       name: String,
       default: Option[T] = None,
       masterDriven: Boolean = true): T = {
-    require(wire.getWidth <= io.ctrl.nastiXDataBits)
+    require(wire.getWidth <= io.mmio.nastiXDataBits)
     val reg = default match {
       case None => Reg(wire.cloneType)
       case Some(init) => RegInit(init)
@@ -113,19 +112,13 @@ abstract class Widget(implicit p: Parameters) extends Module {
   def genRORegInit[T <: Data](wire: T, name: String, default: T): T =
     genAndAttachReg(wire, name, Some(default), false)
 
-  def genCRFile() {
-    val crFile = Module(new MCRFile(numRegs)(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-    crFile.io.mcr := DontCare
-    crFile.io.nasti <> io.ctrl
-    crRegistry.bindRegs(crFile.io.mcr)
-    annotate(ChiselAnnotation(crFile, classOf[DedupModules], "nodedup!"))
-  }
-
-  // Returns a word addresses
-  def getCRAddr(name: String): Int = {
-    require(_finalized, "Must build Widgets with their companion object")
-    crRegistry.lookupAddress(name).getOrElse(
-      throw new RuntimeException(s"Could not find CR:${name} in widget: $wName"))
+  def genMMIOFile() {
+    val mmioFile = Module(new MCRFile(numRegs)(
+      p alterPartial ({ case NastiKey => p(MMIONastiKey) })))
+    mmioFile.io.mcr := DontCare
+    mmioFile.io.nasti <> io.mmio
+    mmioRegistry.bindRegs(mmioFile.io.mcr)
+    annotate(ChiselAnnotation(mmioFile, classOf[DedupModules], "nodedup!"))
   }
 
   def headerComment(sb: StringBuilder) {
@@ -137,10 +130,10 @@ abstract class Widget(implicit p: Parameters) extends Module {
   def genHeader(base: BigInt, sb: StringBuilder){
     require(_finalized, "Must build Widgets with their companion object")
     headerComment(sb)
-    crRegistry.genHeader(wName.getOrElse(name).toUpperCase, base, sb)
+    mmioRegistry.genHeader(wName.getOrElse(name).toUpperCase, base, sb)
   }
 
-  def printCRs = crRegistry.printCRs
+  def printCRs = mmioRegistry.printCRs
 }
 
 // TODO: Need to handle names better; try and stick ctrl IO elaboration in here,
@@ -186,19 +179,19 @@ trait HasWidgets {
 
   private def sortedWidgets = widgets.toSeq.sortWith(_.memRegionSize > _.memRegionSize)
 
-  def genCtrlIO(master: WidgetMMIO, addrSize: BigInt)(implicit p: Parameters) {
-    val ctrlInterconnect = Module(new NastiRecursiveInterconnect(
+  def genMMIO(master: WidgetMMIO, addrSize: BigInt)(implicit p: Parameters) {
+    val mmioInterconnect = Module(new NastiRecursiveInterconnect(
       nMasters = 1,
       addrMap = addrMap
-    )(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-    ctrlInterconnect.io.masters(0) <> master
+    )(p alterPartial ({ case NastiKey => p(MMIONastiKey) })))
+    mmioInterconnect.io.masters(0) <> master
     // We should truncate upper bits of master addresses
     // according to the size of flatform MMIO
     val addrSizeBits = log2Up(addrSize)
-    ctrlInterconnect.io.masters(0).aw.bits.addr := master.aw.bits.addr(addrSizeBits, 0)
-    ctrlInterconnect.io.masters(0).ar.bits.addr := master.ar.bits.addr(addrSizeBits, 0)
-    sortedWidgets.zip(ctrlInterconnect.io.slaves) foreach {
-      case (w: Widget, m) => w.io.ctrl <> m
+    mmioInterconnect.io.masters(0).aw.bits.addr := master.aw.bits.addr(addrSizeBits, 0)
+    mmioInterconnect.io.masters(0).ar.bits.addr := master.ar.bits.addr(addrSizeBits, 0)
+    sortedWidgets.zip(mmioInterconnect.io.slaves) foreach {
+      case (w: Widget, m) => w.io.mmio <> m
     }
   }
 
@@ -208,17 +201,5 @@ trait HasWidgets {
 
   def printWidgets {
     widgets foreach ((w: Widget) => println(w.getWName))
-  }
-
-  def getCRAddr(wName: String, crName: String)(implicit channelWidth: Int): BigInt = {
-    val widget = name2inst.get(wName).getOrElse(
-      throw new RuntimeException("Could not find Widget: $wName"))
-    getCRAddr(widget, crName)
-  }
-
-  def getCRAddr(w: Widget, crName: String)(implicit channelWidth: Int): BigInt = {
-    // TODO: Deal with byte vs word addresses && don't use a name in the hash?
-    val base = (addrMap(w.getWName).start >> log2Up(channelWidth/8))
-    base + w.getCRAddr(crName)
   }
 }

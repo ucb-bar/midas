@@ -27,10 +27,10 @@ trait HasChannels {
 class PeekPokeIOWidgetIO(inNum: Int, outNum: Int)(implicit p: Parameters)
     extends WidgetIO()(p) {
   // Channel width == width of simulation MMIO bus
-  val ins  = Vec(inNum, Decoupled(UInt(ctrl.nastiXDataBits.W)))
-  val outs = Flipped(Vec(outNum, Decoupled(UInt(ctrl.nastiXDataBits.W))))
+  val ins  = Vec(inNum, Decoupled(UInt(mmio.nastiXDataBits.W)))
+  val outs = Flipped(Vec(outNum, Decoupled(UInt(mmio.nastiXDataBits.W))))
 
-  val step = Flipped(Decoupled(UInt(ctrl.nastiXDataBits.W)))
+  val step = Flipped(Decoupled(UInt(mmio.nastiXDataBits.W)))
   val idle = Bool(OUTPUT)
   val tReset = Decoupled(Bool())
 }
@@ -45,8 +45,8 @@ class PeekPokeIOWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
   val io = IO(new PeekPokeIOWidgetIO(numInputChannels, numOutputChannels))
 
   // i = input, o = output tokens (as seen from the target)
-  val iTokensAvailable = RegInit(0.U(io.ctrl.nastiXDataBits.W))
-  val oTokensPending = RegInit(1.U(io.ctrl.nastiXDataBits.W))
+  val iTokensAvailable = RegInit(0.U(io.mmio.nastiXDataBits.W))
+  val oTokensPending = RegInit(1.U(io.mmio.nastiXDataBits.W))
 
   // needs back pressure from reset queues
   val fromHostReady = io.ins.foldLeft(io.tReset.ready)(_ && _.ready)
@@ -95,7 +95,7 @@ class PeekPokeIOWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
   io.tReset.bits := resetNext || io.ins(0).bits(0)
   io.tReset.valid := resetNext || io.ins(0).valid
 
-  genCRFile()
+  genMMIOFile()
 
   override def genHeader(base: BigInt, sb: StringBuilder): Unit = {
     import CppGenerationUtils._

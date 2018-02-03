@@ -9,19 +9,15 @@ import junctions._
 import freechips.rocketchip.config.{Parameters, Field}
 
 class F1ShimIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
-  val master = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(MasterNastiKey) })))
-  // val NICmaster = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
-  val slave  = new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) }))
+  val master = Flipped(widgets.WidgetMMIO())
+  val slave  = new NastiIO()(p alterPartial ({ case NastiKey => p(midas.core.MemNastiKey) }))
 }
 
 class F1Shim(simIo: midas.core.SimWrapperIO)
               (implicit p: Parameters) extends PlatformShim {
   val io = IO(new F1ShimIO)
   val top = Module(new midas.core.FPGATop(simIo))
-  val headerConsts = List(
-    "MMIO_WIDTH" -> p(MasterNastiKey).dataBits / 8,
-    "MEM_WIDTH"  -> p(SlaveNastiKey).dataBits / 8
-  ) ++ top.headerConsts
+  val headerConsts = top.headerConsts
 
   val cyclecount = Reg(init = UInt(0, width=64.W))
   cyclecount := cyclecount + UInt(1)
@@ -162,14 +158,13 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
       )
   }
 
-  top.io.ctrl <> io.master
+  top.io.mmio <> io.master
   io.slave <> top.io.mem
-  // top.io.NICmaster <> io.NICmaster
 
   val (wCounterValue, wCounterWrap) = Counter(io.master.aw.fire(), 4097)
-  top.io.ctrl.aw.bits.id := wCounterValue
+  top.io.mmio.aw.bits.id := wCounterValue
 
   val (rCounterValue, rCounterWrap) = Counter(io.master.ar.fire(), 4097)
-  top.io.ctrl.ar.bits.id := rCounterValue
+  top.io.mmio.ar.bits.id := rCounterValue
 
 }

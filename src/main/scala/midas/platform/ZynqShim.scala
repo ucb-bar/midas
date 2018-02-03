@@ -27,23 +27,17 @@ abstract class PlatformShim(implicit p: Parameters) extends Module {
   }
 }
 
-case object MasterNastiKey extends Field[NastiParameters]
-case object SlaveNastiKey extends Field[NastiParameters]
-
 class ZynqShimIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
-  val master = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(MasterNastiKey) })))
-  val slave  = new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) }))
+  val master = Flipped(widgets.WidgetMMIO())
+  val slave  = new NastiIO()(p alterPartial ({ case NastiKey => p(midas.core.MemNastiKey) }))
 }
 
 class ZynqShim(simIo: midas.core.SimWrapperIO)
               (implicit p: Parameters) extends PlatformShim {
   val io = IO(new ZynqShimIO)
   val top = Module(new midas.core.FPGATop(simIo))
-  val headerConsts = List(
-    "MMIO_WIDTH" -> p(MasterNastiKey).dataBits / 8,
-    "MEM_WIDTH"  -> p(SlaveNastiKey).dataBits / 8
-  ) ++ top.headerConsts
+  val headerConsts = top.headerConsts
 
-  top.io.ctrl <> io.master
+  top.io.mmio <> io.master
   io.slave <> top.io.mem
 }

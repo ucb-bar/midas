@@ -142,8 +142,8 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
   // Generate control register file
   val arMeta = Seq(arBuf.io.deq.bits.id, arBuf.io.deq.bits.size, arBuf.io.deq.bits.len)
   val arMetaWidth = (arMeta foldLeft 0)(_ + _.getWidth)
-  assert(arMetaWidth <= io.ctrl.nastiXDataBits)
-  if (tNasti.ar.bits.addr.getWidth + arMetaWidth <= io.ctrl.nastiXDataBits) {
+  assert(arMetaWidth <= io.mmio.nastiXDataBits)
+  if (tNasti.ar.bits.addr.getWidth + arMetaWidth <= io.mmio.nastiXDataBits) {
     genROReg(Cat(arBuf.io.deq.bits.addr +: arMeta), "ar_bits")
   } else {
     genROReg(arBuf.io.deq.bits.addr, "ar_addr")
@@ -152,8 +152,8 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
 
   val awMeta = Seq(awBuf.io.deq.bits.id, awBuf.io.deq.bits.size, awBuf.io.deq.bits.len)
   val awMetaWidth = (awMeta foldLeft 0)(_ + _.getWidth)
-  assert(awMetaWidth <= io.ctrl.nastiXDataBits)
-  if (tNasti.aw.bits.addr.getWidth + awMetaWidth <= io.ctrl.nastiXDataBits) {
+  assert(awMetaWidth <= io.mmio.nastiXDataBits)
+  if (tNasti.aw.bits.addr.getWidth + awMetaWidth <= io.mmio.nastiXDataBits) {
     genROReg(Cat(awBuf.io.deq.bits.addr +: awMeta), "aw_bits")
   } else {
     genROReg(awBuf.io.deq.bits.addr, "aw_addr")
@@ -162,24 +162,24 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
 
   val wMeta = Seq(wBuf.io.deq.bits.strb, wBuf.io.deq.bits.last)
   val wMetaWidth = (wMeta foldLeft 0)(_ + _.getWidth)
-  assert(wMetaWidth <= io.ctrl.nastiXDataBits)
+  assert(wMetaWidth <= io.mmio.nastiXDataBits)
   genROReg(Cat(wMeta), "w_meta")
-  val wdataChunks = (tNasti.w.bits.nastiXDataBits - 1) / io.ctrl.nastiXDataBits + 1
+  val wdataChunks = (tNasti.w.bits.nastiXDataBits - 1) / io.mmio.nastiXDataBits + 1
   val wdataRegs = Seq.fill(wdataChunks)(Reg(UInt()))
   val wdataAddrs = wdataRegs.zipWithIndex map {case (reg, i) =>
-    reg := wBuf.io.deq.bits.data >> (io.ctrl.nastiXDataBits*i).U
+    reg := wBuf.io.deq.bits.data >> (io.mmio.nastiXDataBits*i).U
     attach(reg, s"w_data_$i")
   }
 
   val rMeta = Seq(rBuf.io.deq.bits.id, rBuf.io.deq.bits.resp, rBuf.io.deq.bits.last)
   val rMetaWidth = (rMeta foldLeft 0)(_ + _.getWidth)
   val rMetaReg = Reg(UInt(rMetaWidth.W))
-  assert(rMetaWidth <= io.ctrl.nastiXDataBits)
+  assert(rMetaWidth <= io.mmio.nastiXDataBits)
   attach(rMetaReg, "r_meta")
   rBuf.io.enq.bits.id := rMetaReg >> (tNasti.r.bits.resp.getWidth + 1).U
   rBuf.io.enq.bits.resp := rMetaReg >> 1.U
   rBuf.io.enq.bits.last := rMetaReg(0)
-  val rdataChunks = (tNasti.r.bits.nastiXDataBits - 1) / io.ctrl.nastiXDataBits + 1
+  val rdataChunks = (tNasti.r.bits.nastiXDataBits - 1) / io.mmio.nastiXDataBits + 1
   val rdataRegs = Seq.fill(rdataChunks)(Reg(UInt()))
   val rdataAddrs = rdataRegs.zipWithIndex map {case (reg, i) => attach(reg, s"r_data_$i")}
   rBuf.io.enq.bits.data := Cat(rdataRegs.reverse)
@@ -187,7 +187,7 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
   val bMeta = Seq(bBuf.io.deq.bits.id, bBuf.io.deq.bits.resp)
   val bMetaWidth = (bMeta foldLeft 0)(_ + _.getWidth)
   val bMetaReg = Reg(UInt(bMetaWidth.W))
-  assert(bMetaWidth <= io.ctrl.nastiXDataBits)
+  assert(bMetaWidth <= io.mmio.nastiXDataBits)
   attach(bMetaReg, "b_meta")
   bBuf.io.enq.bits.id := bMetaReg >> (tNasti.b.bits.resp.getWidth).U
   bBuf.io.enq.bits.resp := bMetaReg
@@ -211,7 +211,7 @@ class NastiWidget(implicit val p: Parameters) extends NastiWidgetBase {
   genROReg(stall && !deltaBuf.io.deq.valid, "stall")
   attachDecoupledSink(deltaBuf.io.enq, "delta")
 
-  genCRFile()
+  genMMIOFile()
 
   override def genHeader(base: BigInt, sb: StringBuilder) {
     super.genHeader(base, sb)

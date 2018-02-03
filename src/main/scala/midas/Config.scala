@@ -15,7 +15,6 @@ case object EnableSnapshot extends Field[Boolean]
 case object KeepSamplesInMem extends Field[Boolean]
 case object MemModelKey extends Field[Option[Parameters => MemModel]]
 case object EndpointKey extends Field[EndpointMap]
-case object NICMasterNastiKey extends Field[NastiParameters]
 
 class SimConfig extends Config((site, here, up) => {
   case TraceMaxLen      => 1024
@@ -25,7 +24,7 @@ class SimConfig extends Config((site, here, up) => {
   case DaisyWidth       => 32
   case EnableSnapshot   => false
   case KeepSamplesInMem => true
-  case CtrlNastiKey     => NastiParameters(32, 32, 12)
+  case MMIONastiKey     => NastiParameters(32, 32, 12)
   case MemNastiKey      => NastiParameters(64, 32, 6)
   case EndpointKey      => EndpointMap(Seq(new SimNastiMemIO, new SimAXI4MemIO))
   case MemModelKey      => Some((p: Parameters) => new SimpleLatencyPipe()(p))
@@ -35,8 +34,6 @@ class SimConfig extends Config((site, here, up) => {
 
 class ZynqConfig extends Config(new Config((site, here, up) => {
   case Platform       => Zynq
-  case MasterNastiKey => site(CtrlNastiKey)
-  case SlaveNastiKey  => site(MemNastiKey)
 }) ++ new SimConfig)
 
 class ZynqConfigWithSnapshot extends Config(new Config((site, here, up) => {
@@ -45,11 +42,8 @@ class ZynqConfigWithSnapshot extends Config(new Config((site, here, up) => {
 
 class F1Config extends Config(new Config((site, here, up) => {
   case Platform       => F1
-  case CtrlNastiKey   => NastiParameters(32, 25, 12)
+  case MMIONastiKey   => NastiParameters(32, 25, 12)
   case MemNastiKey    => NastiParameters(64, 32, 16)
-  case MasterNastiKey => site(CtrlNastiKey)
-  case SlaveNastiKey => site(MemNastiKey)
-  case NICMasterNastiKey   => NastiParameters(512, 64, 6)
 }) ++ new SimConfig)
 
 class F1ConfigWithSnapshot extends Config(new Config((site, here, up) => {

@@ -197,7 +197,7 @@ class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel
   val targetFire = tFireHelper.fire(true.B)// dummy arg
   // Generate the configuration registers and tie them to the ctrl bus
   attachIO(model.io.mmReg)
-  genCRFile()
+  genMMIOFile()
   dontTouch(targetFire)
   fame1transform(model)
 
@@ -209,6 +209,6 @@ class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel
     import midas.widgets.CppGenerationUtils._
     super.genHeader(base, sb)
 
-    crRegistry.genArrayHeader(wName.getOrElse(name).toUpperCase, base, sb)
+    mmioRegistry.genArrayHeader(wName.getOrElse(name).toUpperCase, base, sb)
   }
 }

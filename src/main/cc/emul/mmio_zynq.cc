@@ -20,9 +20,9 @@ void mmio_zynq_t::read_req(uint64_t addr) {
 }
 
 void mmio_zynq_t::write_req(uint64_t addr, void* data) {
-  static const size_t CTRL_STRB = (1 << CTRL_STRB_BITS) - 1;
+  static const size_t MMIO_STRB = (1 << MMIO_STRB_BITS) - 1;
   mmio_req_addr_t aw(0, addr << CHANNEL_SIZE, CHANNEL_SIZE, 0);
-  mmio_req_data_t w((char*) data, CTRL_STRB, true);
+  mmio_req_data_t w((char*) data, MMIO_STRB, true);
   this->aw.push(aw);
   this->w.push(w);
 }
@@ -332,7 +332,7 @@ void tick() {
 
   top->io_master_r_ready = m->r_ready();
   top->io_master_b_ready = m->b_ready();
-#if CTRL_DATA_BITS > 64
+#if MMIO_DATA_BITS > 64
   memcpy(top->io_master_w_bits_data, m->w_data(), MMIO_WIDTH);
 #else
   memcpy(&top->io_master_w_bits_data, m->w_data(), MMIO_WIDTH);
@@ -344,7 +344,7 @@ void tick() {
     top->io_master_aw_ready,
     top->io_master_w_ready,
     top->io_master_r_bits_id,
-#if CTRL_DATA_BITS > 64
+#if MMIO_DATA_BITS > 64
     top->io_master_r_bits_data,
 #else
     &top->io_master_r_bits_data,

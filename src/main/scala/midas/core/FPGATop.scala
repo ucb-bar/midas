@@ -14,8 +14,7 @@ case object MemNastiKey extends Field[NastiParameters]
 case object FpgaMMIOSize extends Field[BigInt]
 
 class FPGATopIO(implicit p: Parameters) extends freechips.rocketchip.util.ParameterizedBundle()(p) {
-  val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-  // val NICmaster = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
+  val mmio = Flipped(WidgetMMIO())
   val mem  = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
 }
 
@@ -149,10 +148,6 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
           model.io.tNasti.hBits.w.bits.user := DontCare
         case _ =>
       }
-      // HACKS
-      /* if (widget.HAS_PCIS_MASTER) {
-        widget.io.pcisMASTER <> io.NICmaster
-      } */
 
       channels2Port(widget.io.hPort, endpoint(i)._2)
       // each widget should have its own reset queue
@@ -165,19 +160,22 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     }
   }
 
-  genCtrlIO(io.ctrl, p(FpgaMMIOSize))
+  genMMIO(io.mmio, p(FpgaMMIOSize))
 
   val headerConsts = List(
-    "CTRL_ID_BITS"   -> io.ctrl.nastiExternal.idBits,
-    "CTRL_ADDR_BITS" -> io.ctrl.nastiXAddrBits,
-    "CTRL_DATA_BITS" -> io.ctrl.nastiXDataBits,
-    "CTRL_STRB_BITS" -> io.ctrl.nastiWStrobeBits,
+    "MMIO_ID_BITS"   -> io.mmio.nastiExternal.idBits,
+    "MMIO_ADDR_BITS" -> io.mmio.nastiXAddrBits,
+    "MMIO_DATA_BITS" -> io.mmio.nastiXDataBits,
+    "MMIO_STRB_BITS" -> io.mmio.nastiWStrobeBits,
     "MEM_ADDR_BITS"  -> arb.nastiXAddrBits,
     "MEM_DATA_BITS"  -> arb.nastiXDataBits,
     "MEM_ID_BITS"    -> arb.nastiXIdBits,
     "MEM_SIZE_BITS"  -> arb.nastiXSizeBits,
     "MEM_LEN_BITS"   -> arb.nastiXLenBits,
     "MEM_RESP_BITS"  -> arb.nastiXRespBits,
-    "MEM_STRB_BITS"  -> arb.nastiWStrobeBits
+    "MEM_STRB_BITS"  -> arb.nastiWStrobeBits,
+
+    "MMIO_WIDTH"     -> p(MMIONastiKey).dataBits / 8,
+    "MEM_WIDTH"      -> p(MemNastiKey).dataBits / 8
   )
 }

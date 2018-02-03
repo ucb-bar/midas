@@ -11,7 +11,7 @@ import freechips.rocketchip.config.Parameters
 class EmulationMasterIO(implicit p: Parameters) extends WidgetIO()(p){
   val simReset = Output(Bool())
   val done = Input(Bool())
-  val step = Decoupled(UInt(p(CtrlNastiKey).dataBits.W))
+  val step = Decoupled(UInt(p(MMIONastiKey).dataBits.W))
 }
 
 object Pulsify {
@@ -36,7 +36,7 @@ class EmulationMaster(implicit p: Parameters) extends Widget()(p) {
   genAndAttachQueue(io.step, "STEP")
   genRORegInit(io.done && ~io.simReset, "DONE", UInt(0))
 
-  genCRFile()
+  genMMIOFile()
 
   override def genHeader(base: BigInt, sb: StringBuilder) {
     import CppGenerationUtils._

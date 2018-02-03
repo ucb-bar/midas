@@ -5,35 +5,35 @@ extern "A" void tick
 
   output reg                       master_ar_valid,
   input  reg                       master_ar_ready,
-  output reg [`CTRL_ADDR_BITS-1:0] master_ar_addr,
-  output reg [`CTRL_ID_BITS-1:0]   master_ar_id,
+  output reg [`MMIO_ADDR_BITS-1:0] master_ar_addr,
+  output reg [`MMIO_ID_BITS-1:0]   master_ar_id,
   output reg [2:0]                 master_ar_size,
   output reg [7:0]                 master_ar_len,
 
   output reg                       master_aw_valid,
   input  reg                       master_aw_ready,
-  output reg [`CTRL_ADDR_BITS-1:0] master_aw_addr,
-  output reg [`CTRL_ID_BITS-1:0]   master_aw_id,
+  output reg [`MMIO_ADDR_BITS-1:0] master_aw_addr,
+  output reg [`MMIO_ID_BITS-1:0]   master_aw_id,
   output reg [2:0]                 master_aw_size,
   output reg [7:0]                 master_aw_len,
 
   output reg                       master_w_valid,
   input  reg                       master_w_ready,
-  output reg [`CTRL_STRB_BITS-1:0] master_w_strb,
-  output reg [`CTRL_DATA_BITS-1:0] master_w_data,
+  output reg [`MMIO_STRB_BITS-1:0] master_w_strb,
+  output reg [`MMIO_DATA_BITS-1:0] master_w_data,
   output reg                       master_w_last,
 
   input  reg                       master_r_valid,
   output reg                       master_r_ready,
   input  reg [1:0]                 master_r_resp,
-  input  reg [`CTRL_ID_BITS-1:0]   master_r_id,
-  input  reg [`CTRL_DATA_BITS-1:0] master_r_data,
+  input  reg [`MMIO_ID_BITS-1:0]   master_r_id,
+  input  reg [`MMIO_DATA_BITS-1:0] master_r_data,
   input  reg                       master_r_last,
 
   input  reg                       master_b_valid,
   output reg                       master_b_ready,
   input  reg [1:0]                 master_b_resp,
-  input  reg [`CTRL_ID_BITS-1:0]   master_b_id,
+  input  reg [`MMIO_ID_BITS-1:0]   master_b_id,
 
   input  reg                       slave_ar_valid,
   output reg                       slave_ar_ready,
@@ -90,35 +90,35 @@ module emul;
   
   reg                        master_ar_valid;
   wire                       master_ar_ready;
-  reg  [`CTRL_ADDR_BITS-1:0] master_ar_addr;
-  reg  [`CTRL_ID_BITS-1:0]   master_ar_id;
+  reg  [`MMIO_ADDR_BITS-1:0] master_ar_addr;
+  reg  [`MMIO_ID_BITS-1:0]   master_ar_id;
   reg  [2:0]                 master_ar_size;
   reg  [7:0]                 master_ar_len;
 
   reg                        master_aw_valid;
   wire                       master_aw_ready;
-  reg  [`CTRL_ADDR_BITS-1:0] master_aw_addr;
-  reg  [`CTRL_ID_BITS-1:0]   master_aw_id;
+  reg  [`MMIO_ADDR_BITS-1:0] master_aw_addr;
+  reg  [`MMIO_ID_BITS-1:0]   master_aw_id;
   reg  [2:0]                 master_aw_size;
   reg  [7:0]                 master_aw_len;
 
   reg                        master_w_valid;
   wire                       master_w_ready;
-  reg  [`CTRL_STRB_BITS-1:0] master_w_strb;
-  reg  [`CTRL_DATA_BITS-1:0] master_w_data;
+  reg  [`MMIO_STRB_BITS-1:0] master_w_strb;
+  reg  [`MMIO_DATA_BITS-1:0] master_w_data;
   reg                        master_w_last;
 
   wire                       master_r_valid;
   reg                        master_r_ready;
   wire [1:0]                 master_r_resp;
-  wire [`CTRL_ID_BITS-1:0]   master_r_id;
-  wire [`CTRL_DATA_BITS-1:0] master_r_data;
+  wire [`MMIO_ID_BITS-1:0]   master_r_id;
+  wire [`MMIO_DATA_BITS-1:0] master_r_data;
   wire                       master_r_last;
 
   wire                       master_b_valid;
   reg                        master_b_ready;
   wire [1:0]                 master_b_resp;
-  wire [`CTRL_ID_BITS-1:0]   master_b_id;
+  wire [`MMIO_ID_BITS-1:0]   master_b_id;
 
   wire                       slave_ar_valid;
   reg                        slave_ar_ready;
@@ -154,35 +154,35 @@ module emul;
 
   wire                       master_ar_valid_delay;
   wire                       master_ar_ready_delay;
-  wire [`CTRL_ADDR_BITS-1:0] master_ar_addr_delay;
-  wire [`CTRL_ID_BITS-1:0]   master_ar_id_delay;
+  wire [`MMIO_ADDR_BITS-1:0] master_ar_addr_delay;
+  wire [`MMIO_ID_BITS-1:0]   master_ar_id_delay;
   wire [2:0]                 master_ar_size_delay;
   wire [7:0]                 master_ar_len_delay;
 
   wire                       master_aw_valid_delay;
   wire                       master_aw_ready_delay;
-  wire [`CTRL_ADDR_BITS-1:0] master_aw_addr_delay;
-  wire [`CTRL_ID_BITS-1:0]   master_aw_id_delay;
+  wire [`MMIO_ADDR_BITS-1:0] master_aw_addr_delay;
+  wire [`MMIO_ID_BITS-1:0]   master_aw_id_delay;
   wire [2:0]                 master_aw_size_delay;
   wire [7:0]                 master_aw_len_delay;
 
   wire                       master_w_valid_delay;
   wire                       master_w_ready_delay;
-  wire [`CTRL_STRB_BITS-1:0] master_w_strb_delay;
-  wire [`CTRL_DATA_BITS-1:0] master_w_data_delay;
+  wire [`MMIO_STRB_BITS-1:0] master_w_strb_delay;
+  wire [`MMIO_DATA_BITS-1:0] master_w_data_delay;
   wire                       master_w_last_delay;
 
   wire                       master_r_valid_delay;
   wire                       master_r_ready_delay;
   wire [1:0]                 master_r_resp_delay;
-  wire [`CTRL_ID_BITS-1:0]   master_r_id_delay;
-  wire [`CTRL_DATA_BITS-1:0] master_r_data_delay;
+  wire [`MMIO_ID_BITS-1:0]   master_r_id_delay;
+  wire [`MMIO_DATA_BITS-1:0] master_r_data_delay;
   wire                       master_r_last_delay;
 
   wire                       master_b_valid_delay;
   wire                       master_b_ready_delay;
   wire [1:0]                 master_b_resp_delay;
-  wire [`CTRL_ID_BITS-1:0]   master_b_id_delay;
+  wire [`MMIO_ID_BITS-1:0]   master_b_id_delay;
 
   wire                       slave_ar_valid_delay;
   wire                       slave_ar_ready_delay;
