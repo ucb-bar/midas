@@ -9,12 +9,6 @@ ifeq ($(PLATFORM),zynq)
 host = arm-xilinx-linux-gnueabi
 endif
 
-$(platform_gmp): $(gmp_src_dir)
-	mkdir -p $(platform_gmp_build_dir)
-	cd $(platform_gmp_build_dir) && \
-	../configure --prefix=$(platform_gmp_install_dir) --host=$(host) && \
-	$(MAKE) && $(MAKE) install
-
 # Compile utility code
 lib_files := mm mm_dramsim2 $(if $(filter $(CXX),cl),,midas_context)
 lib_cc    := $(addprefix $(util_dir)/, $(addsuffix .cc, $(lib_files)))
