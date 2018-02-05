@@ -155,6 +155,17 @@ class SimpleLatencyPipe(implicit val p: Parameters) extends NastiWidgetBase {
       wCycleReady := wCycles.io.enq.ready && l2.io.waddr.ready && l2.io.wlast.ready
       rCycles.io.enq.valid := l2.io.resp.valid && !l2.io.resp.bits.wr
       wCycles.io.enq.valid := l2.io.resp.valid && l2.io.resp.bits.wr
+      // L2 Cache stat
+      val l2_resp_valid = Reg(Bool())
+      val l2_hit = RegEnable(l2.io.resp.bits.hit, l2.io.resp.valid)
+      when(fire) {
+        l2_resp_valid := false.B
+      }.elsewhen(l2.io.resp.valid) {
+        l2_resp_valid := true.B
+      }
+      tNasti.l2event.hit := l2_hit && l2_resp_valid
+      tNasti.l2event.miss := !l2_hit && l2_resp_valid
+
       Mux(l2.io.resp.bits.hit, l2Latency, memLatency)
   }
 
