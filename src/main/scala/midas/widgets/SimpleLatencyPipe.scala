@@ -126,8 +126,21 @@ class SimpleLatencyPipe(implicit val p: Parameters) extends NastiWidgetBase {
   val setBits = RegInit(10.U(32.W)) // # Sets = 1024
   val blockBits = RegInit(6.U(32.W)) // # blockSize = 64 Bytes
 
+  val storeInflight = RegInit(false.B)
+  val storeFence = storeInflight && (tNasti.ar.valid || tNasti.aw.valid) && tFire
+  when(!storeInflight) {
+    when(awBuf.io.enq.fire()) {
+      storeInflight := true.B
+    }
+  }.otherwise {
+    when(io.host_mem.b.fire()) {
+      storeInflight := false.B
+    }
+  }
+
   val stall = (rCycleValid && !rBuf.io.deq.valid) ||
-              (wCycleValid && !bBuf.io.deq.valid) || !l2Idle
+              (wCycleValid && !bBuf.io.deq.valid) ||
+              !l2Idle || storeFence
   val (fire, cycles, targetReset) = elaborate(
     stall, rCycleValid, wCycleValid, rCycleReady, wCycleReady)
 
