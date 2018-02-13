@@ -19,6 +19,7 @@ FpgaMemoryModel::FpgaMemoryModel(
     }
   }
 
+  /*
   stats_file.open(stats_file_name, std::ofstream::out);
   if(!stats_file.is_open()) {
     throw std::runtime_error("Could not open output file: " + stats_file_name);
@@ -28,7 +29,7 @@ FpgaMemoryModel::FpgaMemoryModel(
     stats_file << pair.first << ",";
   }
   stats_file << std::endl;
-
+  */
 }
 
 void FpgaMemoryModel::profile() {
