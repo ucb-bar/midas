@@ -138,7 +138,7 @@ void simif_t::step(int n, bool blocking) {
 
 #ifdef LOADMEM
 void simif_t::load_mem(std::string filename) {
-  fprintf(stdout, "[loadmem] start loading\n");
+  fprintf(stderr, "[loadmem] start loading\n");
   std::ifstream file(filename.c_str());
   if (!file) {
     fprintf(stderr, "Cannot open %s\n", filename.c_str());
@@ -158,7 +158,7 @@ void simif_t::load_mem(std::string filename) {
     }
   }
   file.close();
-  fprintf(stdout, "[loadmem] done\n");
+  fprintf(stderr, "[loadmem] done\n");
 }
 
 void simif_t::read_mem(size_t addr, mpz_t& value) {
