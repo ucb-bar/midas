@@ -7,16 +7,28 @@ import junctions._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.config.Parameters
+import freechips.rocketchip.util.BooleanToAugmentedBoolean
 
 abstract class EndpointWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
   def hPort: HostPortIO[Data]
   val tReset = Flipped(Decoupled(Bool()))
-  // val pcisMASTER = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
+  val pcisMASTER = Flipped(new NastiIO()(
+      p.alterPartial({ case NastiKey => p(NICMasterNastiKey) })))
 }
 
 abstract class EndpointWidget(implicit p: Parameters) extends Widget()(p) {
   override def io: EndpointWidgetIO
   val HAS_PCIS_MASTER = false
+
+  def tieOffPcisMaster() {
+    io.pcisMASTER.ar.ready := false.B
+    io.pcisMASTER.aw.ready := false.B
+    io.pcisMASTER.w.ready := false.B
+    io.pcisMASTER.b.valid := false.B
+    io.pcisMASTER.r.valid := false.B
+    io.pcisMASTER.b.bits := DontCare
+    io.pcisMASTER.r.bits := DontCare
+  }
 }
 
 abstract class MemModelConfig // TODO: delete it

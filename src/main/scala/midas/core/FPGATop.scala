@@ -15,7 +15,7 @@ case object FpgaMMIOSize extends Field[BigInt]
 
 class FPGATopIO(implicit p: Parameters) extends freechips.rocketchip.util.ParameterizedBundle()(p) {
   val ctrl = Flipped(new WidgetMMIO()(p alterPartial ({ case NastiKey => p(CtrlNastiKey) })))
-  // val NICmaster = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
+  val pcisMASTER = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
   val mem  = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
 }
 
@@ -150,9 +150,20 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
         case _ =>
       }
       // HACKS
-      /* if (widget.HAS_PCIS_MASTER) {
-        widget.io.pcisMASTER <> io.NICmaster
-      } */
+      if (widget.HAS_PCIS_MASTER) {
+        println(s"${widgetName} connect pcisMASTER")
+        widget.io.pcisMASTER <> io.pcisMASTER
+      } else {
+        println(s"${widgetName} don't connect pcisMASTER")
+        widget.io.pcisMASTER.ar.valid := false.B
+        widget.io.pcisMASTER.aw.valid := false.B
+        widget.io.pcisMASTER.w.valid := false.B
+        widget.io.pcisMASTER.r.ready := false.B
+        widget.io.pcisMASTER.b.ready := false.B
+        widget.io.pcisMASTER.ar.bits := DontCare
+        widget.io.pcisMASTER.aw.bits := DontCare
+        widget.io.pcisMASTER.w.bits := DontCare
+      }
 
       channels2Port(widget.io.hPort, endpoint(i)._2)
       // each widget should have its own reset queue

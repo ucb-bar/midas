@@ -303,4 +303,6 @@ class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel
     val timingModelSettings = model.io.mmReg.getDefaults()
     emitSettings(fileName, functionalModelSettings ++ timingModelSettings)
   }
+
+  tieOffPcisMaster()
 }
