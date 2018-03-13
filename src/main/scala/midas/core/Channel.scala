@@ -5,7 +5,7 @@ package core
 
 import strober.core.{TraceQueue, TraceMaxLen}
 import freechips.rocketchip.config.Parameters
-import freechips.rocketchip.util.ParameterizedBundle
+import midas.util.ParameterizedBundle
 
 import chisel3._
 import chisel3.util._

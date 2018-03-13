@@ -5,7 +5,7 @@ package models
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.config.{Parameters, Field}
-import freechips.rocketchip.util.ParameterizedBundle
+import midas.util.ParameterizedBundle
 import junctions._
 
 class NastiReqChannels(implicit val p: Parameters) extends ParameterizedBundle {

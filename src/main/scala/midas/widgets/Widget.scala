@@ -9,7 +9,7 @@ import chisel3.core.ActualDirection
 import chisel3.core.DataMirror.directionOf
 import junctions._
 import freechips.rocketchip.config.{Parameters, Field}
-import freechips.rocketchip.util.ParameterizedBundle
+import midas.util.ParameterizedBundle
 
 import scala.collection.mutable.{HashMap, ArrayBuffer}
 

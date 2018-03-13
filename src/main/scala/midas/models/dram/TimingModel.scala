@@ -2,7 +2,7 @@ package midas
 package models
 
 import freechips.rocketchip.config.Parameters
-import freechips.rocketchip.util.ParameterizedBundle
+import midas.util.ParameterizedBundle
 import junctions._
 
 import chisel3._

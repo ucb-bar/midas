@@ -5,7 +5,7 @@ package junctions
 import Chisel._
 import scala.math.max
 import scala.collection.mutable.ArraySeq
-import freechips.rocketchip.util._
+import midas.util._
 import freechips.rocketchip.config._
 
 case object NastiKey extends Field[NastiParameters]

@@ -3,7 +3,7 @@ package models
 
 // From RC
 import freechips.rocketchip.config.{Parameters, Field}
-import freechips.rocketchip.util.{ParameterizedBundle, GenericParameterizedBundle}
+import midas.util.{ParameterizedBundle, GenericParameterizedBundle}
 import junctions._
 
 import chisel3._
