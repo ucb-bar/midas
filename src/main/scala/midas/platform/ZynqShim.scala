@@ -7,7 +7,7 @@ import chisel3._
 import chisel3.util._
 import junctions._
 import freechips.rocketchip.config.{Parameters, Field}
-import freechips.rocketchip.util.ParameterizedBundle
+import midas.util.ParameterizedBundle
 
 abstract class PlatformShim(implicit p: Parameters) extends Module {
   def top: midas.core.FPGATop

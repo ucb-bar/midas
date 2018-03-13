@@ -3,7 +3,7 @@ package models
 
 // From RC
 import freechips.rocketchip.config.{Parameters, Field}
-import freechips.rocketchip.util.{DecoupledHelper}
+import midas.util.{DecoupledHelper}
 import junctions._
 
 import chisel3._
