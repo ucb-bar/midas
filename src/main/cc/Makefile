@@ -80,11 +80,14 @@ emul_files := simif simif_emul emul/mmio_$(PLATFORM) sample/sample
 emul_h := $(addprefix $(midas_dir)/, $(addsuffix .h, $(emul_files) emul/mmio))
 emul_cc := $(addprefix $(midas_dir)/, $(addsuffix .cc, $(emul_files) sample/simif_sample))
 emul_v := $(v_dir)/emul_$(PLATFORM).v
+verilator_h := $(midas_dir)/verilator.h
 
 # Compile verilator emulation binary
 VERILATOR ?= verilator --cc --exe
 override VERILATOR_FLAGS := --assert -Wno-STMTDLY -O3 \
-	-CFLAGS "$(CXXFLAGS)" -LDFLAGS "$(LDFLAGS) -lmidas" \
+	-CFLAGS "$(CXXFLAGS) -include $(verilator_h)" \
+	-LDFLAGS "$(LDFLAGS) -lmidas" \
+	+define+PRINTF_COND=\$$c\(\"verbose\"\) \
 	$(VERILATOR_FLAGS)
 
 ifeq ($(PLATFORM),zynq)
@@ -131,7 +134,7 @@ $(OUT_DIR)/$(DESIGN): $(GEN_DIR)/$(DESIGN)-const.h $(design_v) $(emul_v) $(lib) 
 	rm -rf $(GEN_DIR)/$(DESIGN).csrc
 	rm -rf $(OUT_DIR)/$(DESIGN).daidir
 	$(VCS) $(VCS_FLAGS) -Mdir=$(GEN_DIR)/$(DESIGN).csrc +vc+list \
-	+define+STOP_COND=!emul.reset +define+PRINTF_COND=!emul.reset \
+	+define+STOP_COND=!emul.reset +define+PRINTF_COND=emul.printf_cond \
 	-CFLAGS "-include $<" \
 	-o $@ $(GEN_DIR)/$(DESIGN)-const.vh $(design_v) $(emul_v) $(lib) $(DRIVER) $(emul_cc) $(endpoint_cc)
 
@@ -140,7 +143,7 @@ $(OUT_DIR)/$(DESIGN)-debug: $(GEN_DIR)/$(DESIGN)-const.h $(design_v) $(emul_v) $
 	rm -rf $(GEN_DIR)/$(DESIGN)-debug.csrc
 	rm -rf $(OUT_DIR)/$(DESIGN)-debug.daidir
 	$(VCS) $(VCS_FLAGS) -Mdir=$(GEN_DIR)/$(DESIGN)-debug.csrc +vc+list \
-	+define+STOP_COND=!emul.reset +define+PRINTF_COND=!emul.reset +define+DEBUG \
+	+define+STOP_COND=!emul.reset +define+PRINTF_COND=emul.printf_cond +define+DEBUG \
 	-CFLAGS "-include $<" \
 	-o $@ $(GEN_DIR)/$(DESIGN)-const.vh $(design_v) $(emul_v) $(lib) $(DRIVER) $(emul_cc) $(endpoint_cc)
 

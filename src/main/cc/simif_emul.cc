@@ -12,6 +12,7 @@
 #endif
 #include <signal.h>
 
+bool verbose = false;
 uint64_t main_time = 0;
 std::unique_ptr<mmio_t> master;
 std::unique_ptr<mmio_t> dma;
@@ -73,6 +74,9 @@ void simif_emul_t::init(int argc, char** argv, bool log) {
     }
     if (arg.find("+memsize=") == 0) {
       memsize = strtoll(arg.c_str() + 9, NULL, 10);
+    }
+    if (arg.find("+verbose") == 0) {
+      verbose = true;
     }
   }
 

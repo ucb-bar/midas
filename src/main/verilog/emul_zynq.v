@@ -78,8 +78,11 @@ module emul;
   always #(`CLOCK_PERIOD / 2.0) clock = ~clock;
 
   reg [1023:0] vcdplusfile = 0;
+  reg verbose = 0;
+  wire printf_cond = !reset && verbose;
 
   initial begin
+    verbose = $value$plusargs("verbose");
 `ifdef DEBUG
     if ($value$plusargs("waveform=%s", vcdplusfile))
     begin
