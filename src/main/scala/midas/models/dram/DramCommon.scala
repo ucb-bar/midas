@@ -562,6 +562,7 @@ class CommandBusMonitor extends Module {
   switch (io.cmd) {
     is(cmd_act) {
       printf("activate(%d, %d, %d); // %d\n", io.rank, io.bank, io.row, cycleCounter)
+      printf(p"POWER-$cycleCounter,ACT,${io.bank}\n")
     }
     is(cmd_casr) {
       val autoPRE = io.autoPRE
@@ -569,6 +570,11 @@ class CommandBusMonitor extends Module {
       val column = 0.U // Don't care since we aren't checking data
       printf("read(%d, %d, %d, %x, %x); // %d\n",
         io.rank, io.bank, column, autoPRE, burstChop, cycleCounter)
+      when (autoPRE) {
+        printf(p"POWER-$cycleCounter,RDA,${io.bank}\n")
+      }.otherwise {
+        printf(p"POWER-$cycleCounter,RD,${io.bank}\n")
+      }
     }
     is(cmd_casw) {
       val autoPRE = io.autoPRE
@@ -578,13 +584,24 @@ class CommandBusMonitor extends Module {
       val data = 0.U // Don't care since we aren't checking data
       printf("write(%d, %d, %d, %x, %x, %d, %d); // %d\n",
         io.rank, io.bank, column, autoPRE, burstChop, mask, data, cycleCounter)
+      when (autoPRE) {
+        printf(p"POWER-$cycleCounter,WRA,${io.bank}\n")
+      }.otherwise {
+        printf(p"POWER-$cycleCounter,WR,${io.bank}\n")
+      }
     }
     is(cmd_ref) {
       printf("refresh(%d); // %d\n", io.rank, cycleCounter)
+      printf(p"POWER-$cycleCounter,REF\n")
     }
     is(cmd_pre) {
       val preAll = false.B
       printf("precharge(%d,%d,%d); // %d\n",io.rank, io.bank, preAll, cycleCounter)
+      when (preAll) {
+        printf(p"POWER-$cycleCounter,PREA\n")
+      }.otherwise {
+        printf(p"POWER-$cycleCounter,PRE,${io.bank}\n")
+      }
     }
   }
 }
