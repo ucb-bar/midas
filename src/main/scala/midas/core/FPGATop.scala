@@ -162,6 +162,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       widget.io.tReset <> resetQueue.io.deq
       resetQueue.io.enq.bits := defaultIOWidget.io.tReset.bits
       resetQueue.io.enq.valid := defaultIOWidget.io.tReset.valid
+      when(false.B) { printf("%d", resetQueue.io.count) }
       ready && resetQueue.io.enq.ready
     }
   }

@@ -23,6 +23,7 @@ class WireChannel(val w: Int)(implicit p: Parameters) extends Module {
   val tokens = Module(new Queue(UInt(w.W), p(ChannelLen)))
   tokens.io.enq <> io.in
   io.out <> tokens.io.deq
+  when(false.B) { printf("%d", tokens.io.count) }
   if (p(EnableSnapshot)) {
     io.trace <> TraceQueue(tokens.io.deq, io.traceLen)
   } else {
