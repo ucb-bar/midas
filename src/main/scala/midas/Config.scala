@@ -35,6 +35,7 @@ class SimConfig extends Config((site, here, up) => {
   case FpgaMMIOSize     => BigInt(1) << 12 // 4 KB
   case MidasLLCKey      => None
   case AXIDebugPrint    => false
+  case HasInitTokens    => true
 })
 
 class ZynqConfig extends Config(new Config((site, here, up) => {
