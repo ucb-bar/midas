@@ -17,8 +17,14 @@ case object DMANastiKey extends Field[NastiParameters]
 case object FpgaMMIOSize extends Field[BigInt]
 case object HasInitTokens extends Field[Boolean]
 
+object DMAIO {
+  def apply()(implicit p: Parameters): NastiIO = {
+    Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
+  }
+}
+
 class FPGATopIO(implicit p: Parameters) extends WidgetIO {
-  val dma  = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
+  val dma = DMAIO()
   val mem = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
 }
 
@@ -133,7 +139,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     arb.io.master(memIoSize) <> loadMem.io.toSlaveMem
   }
 
-  val dmaPorts = new ListBuffer[NastiIO]
+  val dmaPorts = ListBuffer[NastiIO]()
 
   // Instantiate endpoint widgets
   defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft true.B){ (resetReady, endpoint) =>
