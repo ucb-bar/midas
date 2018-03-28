@@ -35,6 +35,8 @@ class SimConfig extends Config((site, here, up) => {
   case FpgaMMIOSize     => BigInt(1) << 12 // 4 KB
   case MidasLLCKey      => None
   case AXIDebugPrint    => false
+  // WARNING: if it's false, simulation be much slower
+  // unless widgets initiailze output tokens by themselves
   case HasInitTokens    => true
 })
 
