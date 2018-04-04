@@ -47,7 +47,7 @@ class FirstReadyFCFSMMRegIO(val cfg: FirstReadyFCFSConfig) extends BaseDRAMMMReg
 
 class FirstReadyFCFSIO(val cfg: FirstReadyFCFSConfig)(implicit p: Parameters) extends TimingModelIO()(p){
   val mmReg = new FirstReadyFCFSMMRegIO(cfg)
-  val cmdTrace = new CommandTraceIO
+  val cmdTrace = new CommandTraceIO(cfg.dramKey)
 }
 
 class FirstReadyFCFSModel(cfg: FirstReadyFCFSConfig)(implicit p: Parameters) extends TimingModel(cfg)(p)
@@ -281,7 +281,9 @@ class FirstReadyFCFSModel(cfg: FirstReadyFCFSConfig)(implicit p: Parameters) ext
   // Output command stream
   io.cmdTrace.cycle := tCycle
   io.cmdTrace.cmd := selectedCmd
+  io.cmdTrace.rank := cmdRank
   io.cmdTrace.bank := cmdBank
+  io.cmdTrace.row := cmdRow
   io.cmdTrace.autoPRE := casAutoPRE
 
   val powerStats = (rankStateTrackers).zip(UIntToOH(cmdRank).toBools) map {

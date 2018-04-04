@@ -696,13 +696,13 @@ class RankPowerMonitor(key: DramOrganizationParams) extends Module with HasDRAMM
   io.stats := stats
 }
 
-// Outputs for feeding command trace to DRAMPower
-// TODO should we parameterize this?
-class CommandTraceIO extends Bundle {
+class CommandTraceIO(val key: DramOrganizationParams) extends Bundle {
   import DRAMMasEnums._
   val cycle = Output(UInt(32.W))
   val cmd = Output(chiselTypeOf(cmd_nop))
-  val bank = Output(UInt())
+  val bank = Output(UInt(key.bankBits.W))
+  val rank = Output(UInt(key.rankBits.W))
+  val row = Output(UInt(key.rowBits.W))
   val autoPRE = Output(Bool())
 }
 

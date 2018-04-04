@@ -31,7 +31,7 @@ class FIFOMASMMRegIO(val cfg: FIFOMASConfig) extends BaseDRAMMMRegIO(cfg) {
 class FIFOMASIO(val cfg: FIFOMASConfig)(implicit p: Parameters) extends TimingModelIO()(p) {
   val mmReg = new FIFOMASMMRegIO(cfg)
   //override def clonetype = new FIFOMASIO(cfg)(p).asInstanceOf[this.type]
-  val cmdTrace = new CommandTraceIO
+  val cmdTrace = new CommandTraceIO(cfg.dramKey)
 }
 
 class FIFOMASModel(cfg: FIFOMASConfig)(implicit p: Parameters) extends TimingModel(cfg)(p)
@@ -163,7 +163,9 @@ class FIFOMASModel(cfg: FIFOMASConfig)(implicit p: Parameters) extends TimingMod
   // Output command stream
   io.cmdTrace.cycle := tCycle
   io.cmdTrace.cmd := selectedCmd
+  io.cmdTrace.rank := cmdRank
   io.cmdTrace.bank := cmdBank
+  io.cmdTrace.row := cmdRow
   io.cmdTrace.autoPRE := casAutoPRE
 
   val powerStats = (rankStateTrackers).zip(UIntToOH(cmdRank).toBools) map {
