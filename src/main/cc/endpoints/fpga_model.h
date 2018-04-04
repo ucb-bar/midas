@@ -29,6 +29,7 @@ public:
   virtual void init() = 0;
   virtual void profile() = 0;
   virtual void finish() = 0;
+  virtual void tick() = 0;
 
 protected:
   AddressMap addr_map;
@@ -53,6 +54,14 @@ protected:
     assert(sizeof(data_t) == 4);
     uint64_t data = ((uint64_t) (read(msw) & upper_word_mask)) << 32;
     return data | read(lsw);
+  }
+
+  inline ssize_t pull(size_t addr, char *data, size_t size) {
+    return sim->pull(addr, data, size);
+  }
+
+  inline ssize_t push(size_t addr, char *data, size_t size) {
+    return sim->push(addr, data, size);
   }
 
 };

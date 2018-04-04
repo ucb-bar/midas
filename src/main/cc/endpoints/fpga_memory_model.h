@@ -21,6 +21,7 @@ public:
   void init();
   void profile() {};
   void finish();
+  void tick() {};
   std::string name;
   uint64_t latency[HISTOGRAM_SIZE];
 
@@ -39,6 +40,7 @@ public:
   void init();
   void profile();
   void finish();
+  void tick();
 
 private:
   // Saves a map of register names to settings

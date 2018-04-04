@@ -3,7 +3,7 @@
 package midas
 package widgets
 
-import core.{HostPort, HostPortIO, MemNastiKey}
+import core.{HostPort, HostPortIO, MemNastiKey, DMANastiKey}
 import junctions._
 
 import chisel3._
@@ -27,7 +27,8 @@ class MemModelIO(implicit p: Parameters) extends EndpointWidgetIO()(p){
   val tNasti = Flipped(HostPort(new NastiIO, false))
   val host_mem = new NastiIO()(p.alterPartial({ case NastiKey => p(MemNastiKey)}))
   def hPort = tNasti
-  val dma = None
+  val dma = Some(Flipped(new NastiIO()(
+      p.alterPartial({ case NastiKey => p(DMANastiKey) }))))
 }
 
 abstract class MemModel(implicit p: Parameters) extends EndpointWidget()(p){

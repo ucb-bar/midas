@@ -3,7 +3,7 @@ package models
 
 // From RC
 import freechips.rocketchip.config.{Parameters, Field}
-import freechips.rocketchip.util.{DecoupledHelper}
+import freechips.rocketchip.util.{DecoupledHelper, HellaQueue}
 import freechips.rocketchip.diplomacy.{LazyModule}
 import junctions._
 
@@ -106,11 +106,123 @@ class FuncModelProgrammableRegs extends Bundle with HasProgrammableRegisters {
   }
 }
 
+// COPY FROM FireSim's SimpleNICWidget
+// TODO: probably unnecessary here.
+class SplitSeqQueue(implicit p: Parameters) extends Module {
+  /* hacks. the version of FIRRTL we're using can't handle >= 512-bit-wide
+     stuff. there are a variety of reasons to not fix it this way, but I just
+     want to keep building this
+  */
+  val EXTERNAL_WIDTH = 512
+  val io = IO(new Bundle {
+    val enq = Flipped(DecoupledIO(UInt(EXTERNAL_WIDTH.W)))
+    val deq = DecoupledIO(UInt(EXTERNAL_WIDTH.W))
+  })
+
+  val SPLITS = 32
+  val INTERNAL_WIDTH = EXTERNAL_WIDTH / SPLITS
+  val DEPTH = 100
+
+  val voq = VecInit(Seq.fill(SPLITS)(Module((new HellaQueue(DEPTH)){ UInt(INTERNAL_WIDTH.W) } ).io))
+
+  def fire_enq(exclude: Bool, includes: Bool*) = {
+    val rvs = Array (
+      io.enq.valid
+    )
+    val qs = voq.map(_.enq.ready)
+    val allstuff = rvs ++ qs
+    (allstuff.filter(_ ne exclude) ++ includes).reduce(_ && _)
+  }
+
+  io.enq.ready := fire_enq(io.enq.valid)
+
+  for (i <- 0 until SPLITS) {
+    voq(i).enq.valid := fire_enq(voq(i).enq.ready)
+    voq(i).enq.bits := io.enq.bits((i+1)*INTERNAL_WIDTH-1, i*INTERNAL_WIDTH)
+  }
+
+  def fire_deq(exclude: Bool, includes: Bool*) = {
+    val rvs = Array (
+      io.deq.ready
+    )
+    val qs = voq.map(_.deq.valid)
+    val allstuff = rvs ++ qs
+    (allstuff.filter(_ ne exclude) ++ includes).reduce(_ && _)
+  }
+  for (i <- 0 until SPLITS) {
+    voq(i).deq.ready := fire_deq(voq(i).deq.valid)
+  }
+  io.deq.bits := Cat(voq.map(_.deq.bits).reverse)
+  io.deq.valid := fire_deq(io.deq.ready)
+}
+
 class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel
     with DontTouchAnnotator with Fame1Annotator {
 
   val model = cfg.elaborate()
   printGenerationConfig
+
+  // model.io.cmdTrace is the command trace coming off of the model
+  //
+  // class CommandTraceIO extends Bundle {
+  // import DRAMMasEnums._
+  // val cycle = Output(UInt(32.W))
+  // val cmd = Output(chiselTypeOf(cmd_nop))
+  // val bank = Output(UInt())
+  // val autoPRE = Output(Bool())
+  // }
+
+  // copy from FireSim's SimpleNICWidget, because it should work here too
+  val outgoingPCISdat = Module(new SplitSeqQueue)
+  val PCIS_BYTES = 64
+
+  outgoingPCISdat.io.enq.bits := model.io.cmdTrace.asUInt
+
+  // and io.dma gets you access to pcis
+  io.dma.map { dma =>
+    // copy from FireSim's SimpleNICWidget, because it should work here too
+    val ar_queue = Queue(dma.ar, 10)
+
+    assert(!ar_queue.valid || ar_queue.bits.size === log2Ceil(PCIS_BYTES).U)
+
+    def fire_read(exclude: Bool, includes: Bool*) = {
+      val rvs = Array (
+        ar_queue.valid,
+        dma.r.ready,
+        outgoingPCISdat.io.deq.valid
+      )
+      (rvs.filter(_ ne exclude) ++ includes).reduce(_ && _)
+    }
+
+    val readBeatCounter = RegInit(0.U(9.W))
+    when (fire_read(true.B, readBeatCounter === ar_queue.bits.len)) {
+      //printf("resetting readBeatCounter\n")
+      readBeatCounter := 0.U
+    } .elsewhen(fire_read(true.B)) {
+      //printf("incrementing readBeatCounter\n")
+      readBeatCounter := readBeatCounter + 1.U
+    } .otherwise {
+      readBeatCounter := readBeatCounter
+    }
+
+    outgoingPCISdat.io.deq.ready := fire_read(outgoingPCISdat.io.deq.valid)
+
+    dma.r.valid := fire_read(dma.r.ready)
+    dma.r.bits.data := outgoingPCISdat.io.deq.bits
+    dma.r.bits.resp := 0.U(2.W)
+    dma.r.bits.last := readBeatCounter === ar_queue.bits.len
+    dma.r.bits.id := ar_queue.bits.id
+    dma.r.bits.user := ar_queue.bits.user
+    ar_queue.ready := fire_read(ar_queue.valid, readBeatCounter === ar_queue.bits.len)
+
+    // we don't care about writes
+    dma.aw.ready := 0.U
+    dma.w.ready := 0.U
+    dma.b.valid := 0.U
+    dma.b.bits.resp := 0.U(2.W)
+    dma.b.bits.id := 0.U
+    dma.b.bits.user := 0.U
+  }
 
   // Debug: Put an optional bound on the number of memory requests we can make
   // to the host memory system
@@ -181,7 +293,20 @@ class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel
 
   val tFireHelper = DecoupledHelper(io.tNasti.toHost.hValid,
                                     io.tNasti.fromHost.hReady,
-                                    ingressReady, bReady, rReady, tResetReady)
+                                    ingressReady, bReady, rReady, tResetReady,
+                                    outgoingPCISdat.io.enq.ready)
+  outgoingPCISdat.io.enq.valid := tFireHelper.fire(outgoingPCISdat.io.enq.ready)
+
+  when (tFireHelper.fire(true.B)) {
+    printf("%d\n", model.io.cmdTrace.cycle)
+    printf("%d\n", model.io.cmdTrace.cmd)
+    printf("%d\n", model.io.cmdTrace.bank)
+    printf("%d\n", model.io.cmdTrace.autoPRE)
+  }
+
+
+  attach(outgoingPCISdat.io.deq.valid && !outgoingPCISdat.io.enq.ready, "tracequeuefull", ReadOnly)
+
 
   io.tNasti.toHost.hReady := tFireHelper.fire(io.tNasti.toHost.hValid)
   io.tNasti.fromHost.hValid := tFireHelper.fire(io.tNasti.fromHost.hReady)
