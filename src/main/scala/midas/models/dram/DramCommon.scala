@@ -696,6 +696,16 @@ class RankPowerMonitor(key: DRAMOrganizationKey) extends Module with HasDRAMMASC
   io.stats := stats
 }
 
+// Outputs for feeding command trace to DRAMPower
+// TODO should we parameterize this?
+class CommandTraceIO extends Bundle {
+  import DRAMMasEnums._
+  val cycle = Output(UInt(32.W))
+  val cmd = Output(chiselTypeOf(cmd_nop))
+  val bank = Output(UInt())
+  val autoPRE = Output(Bool())
+}
+
 class DRAMBackendIO(val latencyBits: Int)(implicit val p: Parameters) extends Bundle {
   val newRead = Flipped(Decoupled(new ReadResponseMetaData))
   val newWrite = Flipped(Decoupled(new WriteResponseMetaData))

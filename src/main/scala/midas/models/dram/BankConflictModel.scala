@@ -44,6 +44,7 @@ class BankConflictMMRegIO(cfg: BankConflictConfig) extends SplitTransactionMMReg
 class BankConflictIO(cfg: BankConflictConfig)(implicit p: Parameters)
     extends SplitTransactionModelIO()(p) {
   val mmReg = new BankConflictMMRegIO(cfg)
+  val cmdTrace = new CommandTraceIO
 }
 
 class BankQueueEntry(cfg: BankConflictConfig)(implicit p: Parameters) extends Bundle {

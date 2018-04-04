@@ -53,6 +53,8 @@ abstract class TimingModelIO(implicit val p: Parameters) extends Bundle {
   val egressResp = Flipped(new EgressResp)
   // This sub-bundle contains all the programmable fields of the model
   val mmReg: MMRegIO
+  // This sub-bundle is for cycle-by-cycle trace of commands
+  val cmdTrace: CommandTraceIO
 }
 
 abstract class TimingModel(val cfg: BaseConfig)(implicit val p: Parameters) extends Module
