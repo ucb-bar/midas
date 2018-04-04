@@ -20,7 +20,7 @@ import Console.{UNDERLINED, RESET}
 import java.io.{File, FileWriter}
 
 // State to track reads to DRAM, ~loosely an MSHR
-class MSHR(llcKey: LLCKey)(implicit p: Parameters) extends NastiBundle()(p) {
+class MSHR(llcKey: LLCParams)(implicit p: Parameters) extends NastiBundle()(p) {
   val set_addr = UInt(llcKey.sets.maxBits.W)
   val xaction = new TransactionMetaData
   val wb_in_flight = Bool()
@@ -33,7 +33,7 @@ class MSHR(llcKey: LLCKey)(implicit p: Parameters) extends NastiBundle()(p) {
 }
 
 object MSHR {
-  def apply(llcKey: LLCKey)(implicit p: Parameters): MSHR = {
+  def apply(llcKey: LLCParams)(implicit p: Parameters): MSHR = {
     val w = Wire(new MSHR(llcKey))
     w.wb_in_flight := false.B
     w.acq_in_flight := false.B
@@ -42,7 +42,7 @@ object MSHR {
     w
   }
   def apply(
-      llcKey: LLCKey,
+      llcKey: LLCParams,
       xaction: TransactionMetaData,
       set_addr: UInt,
       do_acq: Bool,
@@ -63,7 +63,7 @@ class BlockMetadata(tagBits: Int) extends Bundle {
   override def cloneType = new BlockMetadata(tagBits).asInstanceOf[this.type]
 }
 
-class LLCProgrammableSettings(llcKey: LLCKey) extends Bundle
+class LLCProgrammableSettings(llcKey: LLCParams) extends Bundle
     with HasProgrammableRegisters with HasConsoleUtils {
   val wayBits    = Input(UInt(log2Ceil(llcKey.ways.maxBits).W))
   val setBits    = Input(UInt(log2Ceil(llcKey.sets.maxBits).W))
@@ -76,8 +76,8 @@ class LLCProgrammableSettings(llcKey: LLCKey) extends Bundle
   // Note short-burst writes will produce a refill, whereas releases from caches will not
 
   val registers = Seq(
-    wayBits   -> RuntimeSetting(2, "Log2(ways per set)"),
-    setBits   -> RuntimeSetting(4, "Log2(sets per bank"),
+    wayBits   -> RuntimeSetting(3, "Log2(ways per set)"),
+    setBits   -> RuntimeSetting(9, "Log2(sets per bank"),
     blockBits -> RuntimeSetting(6, "Log2(cache-block bytes")
   )
 
@@ -94,10 +94,10 @@ class LLCProgrammableSettings(llcKey: LLCKey) extends Bundle
     regMap(blockBits).set(log2Ceil(requestInput("Block size in bytes", 128,
                                                 min = Some(llcKey.blockBytes.min),
                                                 max = Some(llcKey.sets.max))))
-    regMap(wayBits).set(log2Ceil(requestInput("Number of sets in LLC", 4096,
+    regMap(setBits).set(log2Ceil(requestInput("Number of sets in LLC", 4096,
                                                min = Some(llcKey.sets.min),
                                                max = Some(llcKey.sets.max))))
-    regMap(setBits).set(log2Ceil(requestInput("Set associativity", 8,
+    regMap(wayBits).set(log2Ceil(requestInput("Set associativity", 8,
                                               min = Some(llcKey.ways.min),
                                               max = Some(llcKey.ways.max))))
   }
@@ -110,16 +110,15 @@ case class WRange(min: Int, max: Int) {
   override def toString(): String = s"[${min},${max}]"
 }
 
-case class LLCKey(
+case class LLCParams(
     ways: WRange       = WRange(1, 8),
     sets: WRange       = WRange(32, 4096),
     blockBytes: WRange = WRange(8, 128),
-    banks: WRange      = WRange(1, 1),
     mshrs: WRange      = WRange(1, 8)// TODO: check against AXI ID width
   ) {
 
   def maxTagBits(addrWidth: Int): Int =
-    addrWidth - blockBytes.minBits - banks.minBits - sets.minBits
+    addrWidth - blockBytes.minBits - sets.minBits
 
   def print(): Unit = {
     println("  LLC Parameters:")
@@ -131,7 +130,7 @@ case class LLCKey(
   }
 }
 
-class LLCModelIO(val key: LLCKey)(implicit val p: Parameters) extends Bundle {
+class LLCModelIO(val key: LLCParams)(implicit val p: Parameters) extends Bundle {
   val req = Flipped(new NastiReqChannels)
   val wResp = Decoupled(new WriteResponseMetaData) // to backend
   val rResp = Decoupled(new ReadResponseMetaData)

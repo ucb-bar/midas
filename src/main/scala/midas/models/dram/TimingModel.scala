@@ -23,11 +23,19 @@ abstract class MMRegIO(cfg: BaseConfig) extends Bundle with HasProgrammableRegis
   } else {
     (None, None)
   }
+  val (totalReadBeats, totalWriteBeats) = if (cfg.params.beatCounters) {
+    (Some(Output(UInt(32.W))),  Some(Output(UInt(32.W))))
+  } else {
+    (None, None)
+  }
 
   val llc = if (cfg.useLLCModel) Some(new LLCProgrammableSettings(cfg.params.llcKey.get)) else None
 
   // Instrumentation Registers
-  val bins = cfg.params.occupancyHistograms.getOrElse(0)
+  val bins = cfg.params.occupancyHistograms match {
+    case Some(rules) => rules.size
+    case None => 0
+  }
   val readOutstandingHistogram = Output(Vec(bins, UInt(32.W)))
   val writeOutstandingHistogram = Output(Vec(bins, UInt(32.W)))
 
@@ -101,15 +109,9 @@ abstract class TimingModel(val cfg: BaseConfig)(implicit val p: Parameters) exte
   pendingWReq.inc := tNasti.w.fire() && tNasti.w.bits.last
   pendingWReq.dec := tNasti.b.fire()
 
-  assert(!tNasti.ar.valid ||
-    (tNasti.ar.bits.len === 0.U || tNasti.ar.bits.size === log2Ceil(nastiXDataBits/8).U),
-    "Illegal ar request: memory model only supports full-width bursts")
   assert(!tNasti.ar.valid || (tNasti.ar.bits.burst === NastiConstants.BURST_INCR),
     "Illegal ar request: memory model only supports incrementing bursts")
 
-  assert(!tNasti.aw.valid ||
-    (tNasti.aw.bits.len === 0.U || tNasti.aw.bits.size === log2Ceil(nastiXDataBits/8).U),
-    "Illegal aw request: memory model only supports full-width bursts")
   assert(!tNasti.aw.valid || (tNasti.aw.bits.burst === NastiConstants.BURST_INCR),
     "Illegal aw request: memory model only supports incrementing bursts")
 
@@ -146,18 +148,30 @@ abstract class TimingModel(val cfg: BaseConfig)(implicit val p: Parameters) exte
     io.mmReg.totalWrites foreach { _ := totalWrites }
   }
 
-  cfg.params.occupancyHistograms foreach { num_bins =>
-    require(isPow2(num_bins))
-    val readOutstandingHistogram = Seq.fill(num_bins)(RegInit(0.U(32.W)))
-    val writeOutstandingHistogram = Seq.fill(num_bins)(RegInit(0.U(32.W)))
+  if (cfg.params.beatCounters) {
+    val totalReadBeats = RegInit(0.U(32.W))
+    val totalWriteBeats = RegInit(0.U(32.W))
+    when(tNasti.r.fire){ totalReadBeats := totalReadBeats + 1.U }
+    when(tNasti.w.fire){ totalWriteBeats := totalWriteBeats + 1.U }
+    io.mmReg.totalReadBeats foreach { _ := totalReadBeats}
+    io.mmReg.totalWriteBeats foreach { _ := totalWriteBeats }
+  }
 
-    (readOutstandingHistogram.zipWithIndex).foreach { case (count, idx) =>
-      count := Mux(pendingReads.value.head(log2Ceil(num_bins)) === idx.U, count + 1.U, count)
-    }
-    (writeOutstandingHistogram.zipWithIndex).foreach { case (count, idx) =>
-      count := Mux(pendingAWReq.value.head(log2Ceil(num_bins)) === idx.U, count + 1.U, count)
-    }
+  cfg.params.occupancyHistograms foreach { binPredicates =>
+    val numBins = binPredicates.size
+    val readOutstandingHistogram = Seq.fill(numBins)(RegInit(0.U(32.W)))
+    val writeOutstandingHistogram = Seq.fill(numBins)(RegInit(0.U(32.W)))
 
+    def bindHistograms(bins: Seq[UInt], predicates: Seq[Bool]): Bool = {
+      (bins.zip(predicates)).foldLeft(false.B)({ case (hasIncrmented, (bin, pred)) =>
+        when (!hasIncrmented && pred) {
+          bin :=  bin + 1.U
+        }
+        hasIncrmented || pred
+      })
+    }
+    bindHistograms(readOutstandingHistogram, binPredicates map { _(pendingReads.value) })
+    bindHistograms(writeOutstandingHistogram, binPredicates map { _(pendingAWReq.value) })
     io.mmReg.readOutstandingHistogram := readOutstandingHistogram
     io.mmReg.writeOutstandingHistogram := writeOutstandingHistogram
   }
