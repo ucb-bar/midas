@@ -278,6 +278,12 @@ class FirstReadyFCFSModel(cfg: FirstReadyFCFSConfig)(implicit p: Parameters) ext
   cmdMonitor.io.row := cmdRow
   cmdMonitor.io.autoPRE := casAutoPRE
 
+  // Output command stream
+  io.cmdTrace.cycle := tCycle
+  io.cmdTrace.cmd := selectedCmd
+  io.cmdTrace.bank := cmdBank
+  io.cmdTrace.autoPRE := casAutoPRE
+
   val powerStats = (rankStateTrackers).zip(UIntToOH(cmdRank).toBools) map {
     case (rankState, cmdUsesThisRank) =>
       val powerMonitor = Module(new RankPowerMonitor(cfg.dramKey))
