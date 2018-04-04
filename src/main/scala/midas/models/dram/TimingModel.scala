@@ -7,6 +7,7 @@ import junctions._
 
 import chisel3._
 import chisel3.util._
+import chisel3.experimental.dontTouch
 
 import midas.core._
 import midas.passes.Fame1Annotator
@@ -64,6 +65,7 @@ abstract class TimingModel(val cfg: BaseConfig)(implicit val p: Parameters) exte
   // containing all of the requisite runtime-settings and instrumentation brought
   // out as inputs and outputs respectively. See MMRegIO above.
   val io: TimingModelIO
+  dontTouch(io)
   val longName: String
   // Implemented by concrete timing models to describe their configuration during
   // chisel elaboration
