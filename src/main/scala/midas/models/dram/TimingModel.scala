@@ -74,6 +74,12 @@ abstract class TimingModel(val cfg: BaseConfig)(implicit val p: Parameters) exte
   // out as inputs and outputs respectively. See MMRegIO above.
   val io: TimingModelIO
   dontTouch(io)
+
+  io.cmdTrace.PADDING0 := UInt(0)
+  io.cmdTrace.PADDING1 := UInt(0)
+  io.cmdTrace.PADDING2 := UInt(0)
+  io.cmdTrace.PADDING3 := UInt(0)
+
   val longName: String
   // Implemented by concrete timing models to describe their configuration during
   // chisel elaboration

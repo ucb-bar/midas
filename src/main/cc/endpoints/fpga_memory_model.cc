@@ -77,7 +77,7 @@ FpgaMemoryModel::FpgaMemoryModel(
   }
 
   power_file = fopen ("powerdat.csv", "w+");
-  fprintf(power_file, "tcycle,cmd,bank,autoPRE\n");
+  fprintf(power_file, "tcycle,cmd,bank,rank,row,autoPRE\n");
 }
 
 void FpgaMemoryModel::tick() {
@@ -91,15 +91,15 @@ void FpgaMemoryModel::tick() {
     if (outfull) {
         pull(0x0, (char*)OUTBUF, QUEUE_DEPTH * 64);
         //fprintf(power_file, "PULLED DATA!:\n");
-        for (int i = 0; i < QUEUE_DEPTH * 8; i++) {
-            if (i % 8 == 0) {
-                fprintf(power_file, "%lld,", (OUTBUF[i] >> 7) & 0xFFFFFFFF);
-                fprintf(power_file, "%lld,", (OUTBUF[i] >> 4) & 0x7);
-                fprintf(power_file, "%lld,", (OUTBUF[i] >> 1) & 0x7);
-                fprintf(power_file, "%lld\n", (OUTBUF[i]) & 0x1);
+        for (int i = 0; i < QUEUE_DEPTH * 8; i+=8) {
+            fprintf(power_file, "%lld,", ((OUTBUF[i+4]) >> 3) & 0xFFFFFFFF);
+            fprintf(power_file, "%lld,", (OUTBUF[i+4]) & 0x7);
+            fprintf(power_file, "%lld,", (OUTBUF[i+3]));
+            fprintf(power_file, "%lld,", (OUTBUF[i+2]));
+            fprintf(power_file, "%lld,", (OUTBUF[i+1]));
+            fprintf(power_file, "%lld\n", (OUTBUF[i+0]));
 
-//                printf("%llx\n", OUTBUF[i]);
-            }
+//           printf("%llx\n", OUTBUF[i]);
         }
     }
 }

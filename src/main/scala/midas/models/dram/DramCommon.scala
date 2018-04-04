@@ -698,12 +698,16 @@ class RankPowerMonitor(key: DramOrganizationParams) extends Module with HasDRAMM
 
 class CommandTraceIO(val key: DramOrganizationParams) extends Bundle {
   import DRAMMasEnums._
-  val cycle = Output(UInt(32.W))
-  val cmd = Output(chiselTypeOf(cmd_nop))
-  val bank = Output(UInt(key.bankBits.W))
-  val rank = Output(UInt(key.rankBits.W))
-  val row = Output(UInt(key.rowBits.W))
-  val autoPRE = Output(Bool())
+  val cycle = Output(UInt(32.W)) // in sw, index 4, shifted by 3
+  val cmd = Output(chiselTypeOf(cmd_nop)) // in sw, index 4
+  val PADDING3 = Output(UInt((64-key.bankBits).W))
+  val bank = Output(UInt(key.bankBits.W)) // in sw, index 3
+  val PADDING2 = Output(UInt((64-key.rankBits).W))
+  val rank = Output(UInt(key.rankBits.W)) // in sw, index 2
+  val PADDING1 = Output(UInt((64-key.rowBits).W))
+  val row = Output(UInt(key.rowBits.W)) // in sw, index 1
+  val PADDING0 = Output(UInt(63.W))
+  val autoPRE = Output(Bool()) // in sw, index 0
 }
 
 class DRAMBackendIO(val latencyBits: Int)(implicit val p: Parameters) extends Bundle {
