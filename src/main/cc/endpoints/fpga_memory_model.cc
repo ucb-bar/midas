@@ -81,13 +81,14 @@ void FpgaMemoryModel::tick() {
     uint64_t outfull = read(MEMMODEL_0(tracequeuefull));
     printf("outfull: %d\n", outfull);
 
+#define QUEUE_DEPTH 100
     
-    uint64_t OUTBUF[800];
+    uint64_t OUTBUF[QUEUE_DEPTH * 8];
 
     if (outfull) {
-        pull(0x0, (char*)OUTBUF, 6400);
+        pull(0x0, (char*)OUTBUF, QUEUE_DEPTH * 64);
         printf("PULLED DATA!:\n");
-        for (int i = 0; i < 800; i++) {
+        for (int i = 0; i < QUEUE_DEPTH * 8; i++) {
             if (i % 8 == 0) {
                 printf("tcycle: %lld\n", (OUTBUF[i] >> 7) & 0xFFFFFFFF);
                 printf("cmd: %lld\n", (OUTBUF[i] >> 4) & 0x7);

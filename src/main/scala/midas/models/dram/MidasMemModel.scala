@@ -295,18 +295,19 @@ class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel
                                     io.tNasti.fromHost.hReady,
                                     ingressReady, bReady, rReady, tResetReady,
                                     outgoingPCISdat.io.enq.ready)
-  outgoingPCISdat.io.enq.valid := tFireHelper.fire(outgoingPCISdat.io.enq.ready)
+
+  // we only send cmds that aren't a nop across
+  import DRAMMasEnums.{cmd_nop}
+  outgoingPCISdat.io.enq.valid := tFireHelper.fire(outgoingPCISdat.io.enq.ready) & (model.io.cmdTrace.cmd =/= cmd_nop)
 
   when (tFireHelper.fire(true.B)) {
-    printf("%d\n", model.io.cmdTrace.cycle)
-    printf("%d\n", model.io.cmdTrace.cmd)
-    printf("%d\n", model.io.cmdTrace.bank)
-    printf("%d\n", model.io.cmdTrace.autoPRE)
+    printf("from chisel tcycle: %d\n", model.io.cmdTrace.cycle)
+    printf("from chisel cmd: %d\n", model.io.cmdTrace.cmd)
+    printf("from chisel bank: %d\n", model.io.cmdTrace.bank)
+    printf("from chisel autoPRE: %d\n", model.io.cmdTrace.autoPRE)
   }
 
-
   attach(outgoingPCISdat.io.deq.valid && !outgoingPCISdat.io.enq.ready, "tracequeuefull", ReadOnly)
-
 
   io.tNasti.toHost.hReady := tFireHelper.fire(io.tNasti.toHost.hValid)
   io.tNasti.fromHost.hValid := tFireHelper.fire(io.tNasti.fromHost.hReady)
