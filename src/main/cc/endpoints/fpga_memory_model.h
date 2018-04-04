@@ -63,6 +63,8 @@ private:
   };
 
   bool has_latency_histograms() { return histograms.size() > 0; };
+  FILE * power_file;
+
 };
 
 #endif // __FPGA_MEMORY_MODEL_H

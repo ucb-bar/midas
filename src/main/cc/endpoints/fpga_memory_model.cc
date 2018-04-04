@@ -75,11 +75,13 @@ FpgaMemoryModel::FpgaMemoryModel(
     histograms.push_back(Histogram(sim, addr_map, "totalReadLatency"));
     histograms.push_back(Histogram(sim, addr_map, "totalWriteLatency"));
   }
+
+  power_file = fopen ("powerdat", "w+");
 }
 
 void FpgaMemoryModel::tick() {
     uint64_t outfull = read(MEMMODEL_0(tracequeuefull));
-    printf("outfull: %d\n", outfull);
+    fprintf(power_file, "outfull: %d\n", outfull);
 
 #define QUEUE_DEPTH 100
     
@@ -87,13 +89,13 @@ void FpgaMemoryModel::tick() {
 
     if (outfull) {
         pull(0x0, (char*)OUTBUF, QUEUE_DEPTH * 64);
-        printf("PULLED DATA!:\n");
+        fprintf(power_file, "PULLED DATA!:\n");
         for (int i = 0; i < QUEUE_DEPTH * 8; i++) {
             if (i % 8 == 0) {
-                printf("tcycle: %lld\n", (OUTBUF[i] >> 7) & 0xFFFFFFFF);
-                printf("cmd: %lld\n", (OUTBUF[i] >> 4) & 0x7);
-                printf("bank: %lld\n", (OUTBUF[i] >> 1) & 0x7);
-                printf("autoPRE: %lld\n", (OUTBUF[i]) & 0x1);
+                fprintf(power_file, "tcycle: %lld\n", (OUTBUF[i] >> 7) & 0xFFFFFFFF);
+                fprintf(power_file, "cmd: %lld\n", (OUTBUF[i] >> 4) & 0x7);
+                fprintf(power_file, "bank: %lld\n", (OUTBUF[i] >> 1) & 0x7);
+                fprintf(power_file, "autoPRE: %lld\n", (OUTBUF[i]) & 0x1);
 
 //                printf("%llx\n", OUTBUF[i]);
             }
@@ -155,4 +157,5 @@ void FpgaMemoryModel::finish() {
   }
   histogram_file.close();
   stats_file.close();
+  fclose(power_file);
 }
