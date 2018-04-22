@@ -55,6 +55,7 @@ void simif_t::init(int argc, char** argv, bool log) {
 }
 
 void simif_t::target_reset(int pulse_start, int pulse_length) {
+#ifdef reset
   poke(reset, 0);
   take_steps(pulse_start, true);
   poke(reset, 1);
@@ -65,6 +66,7 @@ void simif_t::target_reset(int pulse_start, int pulse_length) {
   trace_count = std::min((size_t)(pulse_start + pulse_length), tracelen);
   read_traces(NULL);
   trace_count = 0;
+#endif
 #endif
 }
 
@@ -91,8 +93,8 @@ void simif_t::poke(size_t id, mpz_t& value) {
   }
   size_t size;
   data_t* data = (data_t*)mpz_export(NULL, &size, -1, sizeof(data_t), 0, 0, value);
-  for (size_t i = 0 ; i < INPUT_CHUNKS[id] ; i++) {
-    write(INPUT_ADDRS[id]+i, i < size ? data[i] : 0);
+  for (size_t i = 0 ; i < (const size_t)INPUT_CHUNKS[id] ; i++) {
+    write((size_t)INPUT_ADDRS[id]+i, i < size ? data[i] : 0);
   }
 }
 

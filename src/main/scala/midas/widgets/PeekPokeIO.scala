@@ -92,10 +92,14 @@ class PeekPokeIOWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
   io.step.ready := io.idle
 
   // Target reset connection
-  io.tReset.bits := io.ins(0).bits(0)
-  io.tReset.valid := io.ins(0).valid
-
-  genCRFile()
+  if (io.ins.nonEmpty) {
+    io.tReset.bits := io.ins(0).bits(0)
+    io.tReset.valid := io.ins(0).valid
+    genCRFile()
+  } else {
+    io.tReset := chisel3.core.DontCare
+    io.ctrl   := chisel3.core.DontCare
+  }
 
   override def genHeader(base: BigInt, sb: StringBuilder): Unit = {
     import CppGenerationUtils._
