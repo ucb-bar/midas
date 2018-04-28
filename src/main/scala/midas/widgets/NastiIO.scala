@@ -18,7 +18,6 @@ abstract class EndpointWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
 
 abstract class EndpointWidget(implicit p: Parameters) extends Widget()(p) {
   override def io: EndpointWidgetIO
-  val HAS_PCIS_MASTER = false
 }
 
 abstract class MemModelConfig // TODO: delete it

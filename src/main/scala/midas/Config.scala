@@ -18,7 +18,6 @@ case object HasDMAChannel extends Field[Boolean]
 case object KeepSamplesInMem extends Field[Boolean]
 case object MemModelKey extends Field[Option[Parameters => MemModel]]
 case object EndpointKey extends Field[EndpointMap]
-case object NICMasterNastiKey extends Field[NastiParameters]
 
 class SimConfig extends Config((site, here, up) => {
   case TraceMaxLen      => 1024
@@ -56,7 +55,6 @@ class F1Config extends Config(new Config((site, here, up) => {
   case MemNastiKey    => NastiParameters(64, 34, 16)
   case MasterNastiKey => site(CtrlNastiKey)
   case SlaveNastiKey => site(MemNastiKey)
-  case NICMasterNastiKey   => NastiParameters(512, 64, 6)
 }) ++ new SimConfig)
 
 class F1ConfigWithSnapshot extends Config(new Config((site, here, up) => {
