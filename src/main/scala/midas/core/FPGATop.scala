@@ -16,9 +16,11 @@ case object MemNastiKey extends Field[NastiParameters]
 case object DMANastiKey extends Field[NastiParameters]
 case object FpgaMMIOSize extends Field[BigInt]
 
+val numnodes = 4
+
 class FPGATopIO(implicit p: Parameters) extends WidgetIO {
-  val dma  = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
-  val mem = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
+  val dma  = Vec(numnodes, Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) }))))
+  val mem  = Vec(numnodes, new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
 }
 
 // Platform agnostic wrapper of the simulation models for FPGA 
@@ -122,17 +124,23 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
 
   // Host Memory Channels
   // Masters = Target memory channels + loadMemWidget
-  val arb = Module(new NastiArbiter(memIoSize+1)(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
-  io.mem <> arb.io.slave
-  if (p(MemModelKey) != None) {
-    val loadMem = addWidget(new LoadMemWidget(MemNastiKey), "LOADMEM")
-    loadMem.reset := reset.toBool || simReset
-    arb.io.master(memIoSize) <> loadMem.io.toSlaveMem
+  val arb = Seq.fill(numnodes)(Module(new NastiArbiter(/*memIoSize+1*/2)(p alterPartial ({ case NastiKey => p(MemNastiKey) }))))
+  //io.mem <> arb.io.slave
+  (io.mem.zip(arb)).zipWithIndex.foreach {
+    case ((mem_i, arb_i),i) => {mem_i <> arb_i.io.slave
+      if (p(MemModelKey) != None) {
+        val loadMem = addWidget(new LoadMemWidget(MemNastiKey), s"LOADMEM_$i")
+        loadMem.reset := reset || simReset
+        arb_i.io.master(1/*memIoSize*/) <> loadMem.io.toSlaveMem
+      }
+    }
   }
 
   val dmaPorts = new ListBuffer[NastiIO]
 
   // Instantiate endpoint widgets
+  var mem_model_index=0
+  var nic_index=0
   defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {
@@ -144,20 +152,22 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       widget.reset := reset.toBool || simReset
       widget match {
         case model: MemModel =>
-          arb.io.master(i) <> model.io.host_mem
+          arb(mem_model_index).io.master(0) <> model.io.host_mem
           model.io.tNasti.hBits.aw.bits.user := DontCare
           model.io.tNasti.hBits.aw.bits.region := DontCare
           model.io.tNasti.hBits.ar.bits.user := DontCare
           model.io.tNasti.hBits.ar.bits.region := DontCare
           model.io.tNasti.hBits.w.bits.id := DontCare
           model.io.tNasti.hBits.w.bits.user := DontCare
+          mem_model_index += 1
         case _ =>
       }
+
       channels2Port(widget.io.hPort, endpoint(i)._2)
       widget.io.dma.foreach(dma => dmaPorts += dma)
 
       // each widget should have its own reset queue
-      val resetQueue = Module(new Queue(Bool(), 4))
+      val resetQueue = Module(new Queue(Bool(), numnodes))
       resetQueue.reset := reset.toBool || simReset
       widget.io.tReset <> resetQueue.io.deq
       resetQueue.io.enq.bits := defaultIOWidget.io.tReset.bits
@@ -166,9 +176,11 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     }
   }
 
-  assert(dmaPorts.size <= 1)
+  assert(dmaPorts.size <= numnodes)
   if (dmaPorts.nonEmpty) {
-    dmaPorts(0) <> io.dma
+    for( i <- 0 until numnodes){
+       dmaPorts(i) <> io.dma(i)
+    }
   } else {
     io.dma := DontCare
   }
@@ -180,18 +192,19 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     "CTRL_ADDR_BITS" -> io.ctrl.nastiXAddrBits,
     "CTRL_DATA_BITS" -> io.ctrl.nastiXDataBits,
     "CTRL_STRB_BITS" -> io.ctrl.nastiWStrobeBits,
-    "MEM_ADDR_BITS"  -> arb.nastiXAddrBits,
-    "MEM_DATA_BITS"  -> arb.nastiXDataBits,
-    "MEM_ID_BITS"    -> arb.nastiXIdBits,
-    "MEM_SIZE_BITS"  -> arb.nastiXSizeBits,
-    "MEM_LEN_BITS"   -> arb.nastiXLenBits,
-    "MEM_RESP_BITS"  -> arb.nastiXRespBits,
-    "MEM_STRB_BITS"  -> arb.nastiWStrobeBits,
-    "DMA_ID_BITS"    -> io.dma.nastiXIdBits,
-    "DMA_ADDR_BITS"  -> io.dma.nastiXAddrBits,
-    "DMA_DATA_BITS"  -> io.dma.nastiXDataBits,
-    "DMA_STRB_BITS"  -> io.dma.nastiWStrobeBits,
+    "MEM_ADDR_BITS"  -> arb(0).nastiXAddrBits,
+    "MEM_DATA_BITS"  -> arb(0).nastiXDataBits,
+    "MEM_ID_BITS"    -> arb(0).nastiXIdBits,
+    "MEM_SIZE_BITS"  -> arb(0).nastiXSizeBits,
+    "MEM_LEN_BITS"   -> arb(0).nastiXLenBits,
+    "MEM_RESP_BITS"  -> arb(0).nastiXRespBits,
+    "MEM_STRB_BITS"  -> arb(0).nastiWStrobeBits,
+    "DMA_ID_BITS"    -> io.dma(0).nastiXIdBits,
+    "DMA_ADDR_BITS"  -> io.dma(0).nastiXAddrBits,
+    "DMA_DATA_BITS"  -> io.dma(0).nastiXDataBits,
+    "DMA_STRB_BITS"  -> io.dma(0).nastiWStrobeBits,
     "DMA_WIDTH"      -> p(DMANastiKey).dataBits / 8,
     "DMA_SIZE"       -> log2Ceil(p(DMANastiKey).dataBits / 8)
   )
 }
+

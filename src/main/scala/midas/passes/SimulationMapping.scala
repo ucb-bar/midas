@@ -53,6 +53,13 @@ private[passes] class SimulationMapping(
     case m: ExtModule => None
   }
 
+  // Performs simulation mapping. Here, we:
+  //
+  // 1) In a seperate chisel circuit, generate the token queues on the ports of the target design
+  // and bind them to the ports of a black box (TargetBox) with the same IO as the transfomed target
+  //
+  // 2) Link the transformed target with this simulation wrapper, by combining their firrtl 
+  // circuits and replacing instances of TargetBox with the real target
   def run(c: Circuit) = {
     lazy val sim = new SimWrapper(io)
     val c3circuit = chisel3.Driver.elaborate(() => sim)

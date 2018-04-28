@@ -112,8 +112,8 @@ void mm_magic_t::tick(
     }
   }
 
-  if (b_fire)
-    bresp.pop();
+  if (b_fire) 
+    bresp.pop(); 
 
   if (r_fire)
     rresp.pop();

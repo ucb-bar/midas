@@ -136,6 +136,7 @@ abstract class Widget(implicit p: Parameters) extends Module {
   def genHeader(base: BigInt, sb: StringBuilder){
     require(_finalized, "Must build Widgets with their companion object")
     headerComment(sb)
+    crRegistry.genArrayHeader(wName.getOrElse(name).toUpperCase, base, sb)
     crRegistry.genHeader(wName.getOrElse(name).toUpperCase, base, sb)
   }
 

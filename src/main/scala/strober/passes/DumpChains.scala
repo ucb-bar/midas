@@ -17,7 +17,6 @@ class DumpChains(
     meta: StroberMetaData,
     srams: Map[String, SRAMMacro])
    (implicit param: freechips.rocketchip.config.Parameters) extends firrtl.passes.Pass {
-  
   override def name = "[strober] Dump Daisy Chains"
 
   private def addPad(chainFile: FileWriter, cw: Int, dw: Int)(chainType: ChainType.Value) {

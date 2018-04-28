@@ -5,19 +5,16 @@ package core
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.ArrayBuffer
-
 // from rocketchip
 import junctions.NastiIO
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import freechips.rocketchip.config.{Parameters, Field}
-
 import chisel3._
+import chisel3.internal.firrtl.Port
 import chisel3.util._
 import chisel3.core.{ActualDirection, Reset}
 import chisel3.core.DataMirror.directionOf
-import SimUtils._
-import scala.collection.immutable.ListMap
-import scala.collection.mutable.{ArrayBuffer, HashSet}
+mport SimUtils._
 
 object SimUtils {
   def parsePorts(io: Data, prefix: String = "") = {
@@ -38,19 +35,20 @@ object SimUtils {
         case ActualDirection.Output => outputs += (b -> name)
       }
     }
+
     loop(prefix, io)
     (inputs.toList, outputs.toList)
   }
 
-  def getChunks(b: Bits)(implicit channelWidth: Int): Int =
+  def getChunks(b: Data)(implicit channelWidth: Int): Int =
     (b.getWidth-1)/channelWidth + 1
-  def getChunks(s: Seq[Bits])(implicit channelWidth: Int): Int =
+  def getChunks(s: Seq[Data])(implicit channelWidth: Int): Int =
     (s foldLeft 0)((res, b) => res + getChunks(b))
-  def getChunks(args: (Bits, String))(implicit channelWidth: Int): (String, Int) =
+  def getChunks(args: (Data, String))(implicit channelWidth: Int): (String, Int) =
     args match { case (wire, name) => name -> SimUtils.getChunks(wire) }
 
-  def genIoMap(ports: Seq[(Bits, String)], offset: Int = 0)(implicit channelWidth: Int) =
-    ((ports foldLeft ((ListMap[Bits, Int](), offset))){
+  def genIoMap(ports: Seq[(Data, String)], offset: Int = 0)(implicit channelWidth: Int) =
+    ((ports foldLeft ((ListMap[Data, Int](), offset))){
       case ((map, off), (port, name)) => (map + (port -> off), off + getChunks(port))
     })._1
 }
@@ -102,6 +100,9 @@ class SimWrapperIO(io: TargetBoxIO)
         case v: Vec[_] => v.zipWithIndex foreach {
           case (e, i) => findEndpoint(s"${name}_${i}", e)
         }
+        case h: HeterogeneousBag[AXI4Bundle] => h.elements foreach {
+          case (n, e) => findEndpoint(s"${name}_${n}", e)
+        }
         case _ =>
       }
     }
@@ -116,7 +117,7 @@ class SimWrapperIO(io: TargetBoxIO)
     data.elements.toSeq flatMap {
       case (name, rv: ReadyValidIO[_]) => Nil
       case (name, wires) =>
-        val (ins, outs) = SimUtils.parsePorts(wires)
+        val (ins, outs) = parsePorts(wires, prefix = name)
         (ins ++ outs).unzip._1
     }
   })).toSet
@@ -140,14 +141,14 @@ class SimWrapperIO(io: TargetBoxIO)
   //
   val wireInMap = genIoMap(wireInputs)
   val wireOutMap = genIoMap(wireOutputs)
-  def getIns(arg: (Bits, Int)): Seq[DecoupledIO[UInt]] = arg match {
+  def getIns(arg: (Data, Int)): Seq[DecoupledIO[UInt]] = arg match {
     case (wire, id) => (0 until getChunks(wire)) map (off => wireIns(id+off))
   }
-  def getOuts(arg: (Bits, Int)): Seq[DecoupledIO[UInt]] = arg match {
+  def getOuts(arg: (Data, Int)): Seq[DecoupledIO[UInt]] = arg match {
     case (wire, id) => (0 until getChunks(wire)) map (off => wireOuts(id+off))
   }
-  def getIns(wire: Bits): Seq[DecoupledIO[UInt]] = getIns(wire -> wireInMap(wire))
-  def getOuts(wire: Bits): Seq[DecoupledIO[UInt]] = getOuts(wire -> wireOutMap(wire))
+  def getIns(wire: Data): Seq[DecoupledIO[UInt]] = getIns(wire -> wireInMap(wire))
+  def getOuts(wire: Data): Seq[DecoupledIO[UInt]] = getOuts(wire -> wireOutMap(wire))
 
   /*** ReadyValid Channels ***/
   val readyValidInputs = endpoints flatMap (ep => (0 until ep.size) flatMap { i =>
@@ -248,7 +249,7 @@ class SimWrapper(targetIo: Seq[Data])
     io.wireOutTraces foreach (_ := DontCare)
   }
 
-  def genWireChannels[T <: Bits](arg: (T, String)) =
+  def genWireChannels[T <: Data](arg: (T, String)) =
     arg match { case (port, name) =>
       (0 until getChunks(port)) map { off =>
         val width = scala.math.min(channelWidth, port.getWidth - off * channelWidth)
@@ -266,14 +267,17 @@ class SimWrapper(targetIo: Seq[Data])
       }
     }
 
-  def connectInput[T <: Bits](off: Int, arg: (Bits, String), inChannels: Seq[WireChannel], fire: Bool) =
+  def connectInput[T <: Data](off: Int, arg: (Data, String), inChannels: Seq[WireChannel], fire: Bool) =
     arg match { case (wire, name) =>
       val channels = inChannels slice (off, off + getChunks(wire))
-      wire := Cat(channels.reverse map (_.io.out.bits))
+      wire match {
+        case b :Bits => wire := Cat(channels.reverse map (_.io.out.bits))
+        case b :Clock => wire := Cat(channels.reverse map (_.io.out.bits))(0).asClock
+      }
       off + getChunks(wire)
     }
 
-  def connectOutput[T <: Bits](off: Int, arg: (Bits, String), outChannels: Seq[WireChannel]) =
+  def connectOutput[T <: Data](off: Int, arg: (Data, String), outChannels: Seq[WireChannel]) =
     arg match { case (wire, name) =>
       val channels = outChannels slice (off, off + getChunks(wire))
       channels.zipWithIndex foreach { case (channel, i) =>

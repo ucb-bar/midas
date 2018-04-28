@@ -6,7 +6,7 @@
 #include "sim_mem.h"
 // TODO: support multi channels
 
-sim_mem_t::sim_mem_t(simif_t* sim, int argc, char** argv): endpoint_t(sim) {
+sim_mem_t::sim_mem_t(simif_t* sim, int argc, char** argv): endpoint_t(sim, AddressMap(0,0,0,0,0,0)) {
 #ifdef NASTIWIDGET_0
   std::vector<std::string> args(argv + 1, argv + argc);
   bool dramsim = false;
