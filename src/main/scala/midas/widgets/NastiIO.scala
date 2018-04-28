@@ -14,7 +14,6 @@ abstract class EndpointWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
   def hPort: HostPortIO[Data]
   def dma: Option[NastiIO]
   val tReset = Flipped(Decoupled(Bool()))
-  val pcisMASTER = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(NICMasterNastiKey) })))
 }
 
 abstract class EndpointWidget(implicit p: Parameters) extends Widget()(p) {

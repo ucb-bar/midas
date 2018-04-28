@@ -16,11 +16,9 @@ case object MemNastiKey extends Field[NastiParameters]
 case object DMANastiKey extends Field[NastiParameters]
 case object FpgaMMIOSize extends Field[BigInt]
 
-val numnodes = 4
-
 class FPGATopIO(implicit p: Parameters) extends WidgetIO {
-  val dma  = Vec(numnodes, Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) }))))
-  val mem  = Vec(numnodes, new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
+  val dma  = Vec(4, Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) }))))
+  val mem  = Vec(4, new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) })))
 }
 
 // Platform agnostic wrapper of the simulation models for FPGA 
@@ -124,13 +122,13 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
 
   // Host Memory Channels
   // Masters = Target memory channels + loadMemWidget
-  val arb = Seq.fill(numnodes)(Module(new NastiArbiter(/*memIoSize+1*/2)(p alterPartial ({ case NastiKey => p(MemNastiKey) }))))
+  val arb = Seq.fill(4)(Module(new NastiArbiter(/*memIoSize+1*/2)(p alterPartial ({ case NastiKey => p(MemNastiKey) }))))
   //io.mem <> arb.io.slave
   (io.mem.zip(arb)).zipWithIndex.foreach {
     case ((mem_i, arb_i),i) => {mem_i <> arb_i.io.slave
       if (p(MemModelKey) != None) {
         val loadMem = addWidget(new LoadMemWidget(MemNastiKey), s"LOADMEM_$i")
-        loadMem.reset := reset || simReset
+        loadMem.reset := reset.toBool || simReset
         arb_i.io.master(1/*memIoSize*/) <> loadMem.io.toSlaveMem
       }
     }
@@ -167,7 +165,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       widget.io.dma.foreach(dma => dmaPorts += dma)
 
       // each widget should have its own reset queue
-      val resetQueue = Module(new Queue(Bool(), numnodes))
+      val resetQueue = Module(new Queue(Bool(), 4))
       resetQueue.reset := reset.toBool || simReset
       widget.io.tReset <> resetQueue.io.deq
       resetQueue.io.enq.bits := defaultIOWidget.io.tReset.bits
@@ -176,9 +174,9 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     }
   }
 
-  assert(dmaPorts.size <= numnodes)
+  assert(dmaPorts.size <= 4)
   if (dmaPorts.nonEmpty) {
-    for( i <- 0 until numnodes){
+    for( i <- 0 until 4){
        dmaPorts(i) <> io.dma(i)
     }
   } else {

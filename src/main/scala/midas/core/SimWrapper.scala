@@ -5,16 +5,20 @@ package core
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.ArrayBuffer
+
 // from rocketchip
 import junctions.NastiIO
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import freechips.rocketchip.config.{Parameters, Field}
+
 import chisel3._
-import chisel3.internal.firrtl.Port
 import chisel3.util._
 import chisel3.core.{ActualDirection, Reset}
 import chisel3.core.DataMirror.directionOf
-mport SimUtils._
+import SimUtils._
+import scala.collection.immutable.ListMap
+import scala.collection.mutable.{ArrayBuffer, HashSet}
+import freechips.rocketchip.util.HeterogeneousBag
 
 object SimUtils {
   def parsePorts(io: Data, prefix: String = "") = {

@@ -1,7 +1,7 @@
 package midas
 package platform
 
-mport chisel3._
+import chisel3._
 import chisel3.util._
 import junctions._
 import freechips.rocketchip.config.{Parameters, Field}
@@ -10,13 +10,11 @@ import midas.core.DMANastiKey
 
 case object AXIDebugPrint extends Field[Boolean]
 
-val numnodes = 4
-
 class F1ShimIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
   val master = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(MasterNastiKey) })))
-  val dma    = Vec(numnodes, Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) }))))
-  val slave  = Vec(numnodes, new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) })))
-
+  val dma    = Vec(4, Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) }))))
+  val slave  = Vec(4, new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) })))
+}
 
 class F1Shim(simIo: midas.core.SimWrapperIO)
               (implicit p: Parameters) extends PlatformShim {
@@ -233,7 +231,7 @@ class F1Shim(simIo: midas.core.SimWrapperIO)
   
   //top.io.dma <> io.dma
   io.dma.zip(top.io.dma).foreach {
-    case (dma_i, top_dma_i) => dma_i <> top_dma_i
+    case (dma_i, top_dma_i) => top_dma_i <> dma_i
   }
 
   //io.slave <> top.io.mem

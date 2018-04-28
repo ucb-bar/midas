@@ -54,7 +54,7 @@ private[midas] class MidasTransforms(
         firrtl.passes.RemoveEmpty,
         new Fame1Transform(Some(lib getOrElse json)),
         new strober.passes.StroberTransforms(dir, lib getOrElse json),
-        new SimulationMapping(targetPorts),
+        new SimulationMapping(io),
         new PlatformMapping(state.circuit.main, dir))
       (xforms foldLeft state)((in, xform) =>
         xform runTransform in).copy(form=outputForm)
