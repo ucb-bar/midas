@@ -30,6 +30,7 @@ protected:
 
   inline ssize_t push(size_t addr, char *data, size_t size) {
     return sim->push(addr, data, size);
+  }
   
   void write(std::string reg, data_t data){
     sim->write(addr_map.w_addr(reg), data);

@@ -25,6 +25,7 @@ void simif_t::init(int argc, char** argv, bool log) {
   // Simulation reset
   write(MASTER(SIM_RESET), 1);
   while(!done());
+
   this->log = log;
   std::vector<std::string> args(argv + 1, argv + argc);
   std::string loadmem;

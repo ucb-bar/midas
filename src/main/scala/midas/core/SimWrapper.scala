@@ -104,9 +104,11 @@ class SimWrapperIO(io: TargetBoxIO)
         case v: Vec[_] => v.zipWithIndex foreach {
           case (e, i) => findEndpoint(s"${name}_${i}", e)
         }
+/*
         case h: HeterogeneousBag[AXI4Bundle] => h.elements foreach {
           case (n, e) => findEndpoint(s"${name}_${n}", e)
         }
+*/
         case _ =>
       }
     }

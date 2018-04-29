@@ -39,7 +39,7 @@ private class VerilogCompiler extends firrtl.Compiler {
     getLoweringTransforms(firrtl.MidForm, firrtl.LowForm) ++
     Seq(new firrtl.LowFirrtlOptimization)
 }
-
+/*
 // A convenience class that populates a Record with a port list, returned by Module.getPorts 
 class TargetPortRecord(portList: Seq[Port]) extends Record {
   val elements = ListMap((for (port <- portList) yield {
@@ -60,11 +60,8 @@ object TargetPortRecord {
     new TargetPortRecord(portList)
   }
 }
-
+*/
 object MidasCompiler {
-  // Generates the verilog and memory map for a MIDAS simulation
-  // Accepts: An elaborated chisel circuit, record that mirrors its I/O,
-  // an output directory, and technology library
   def apply(
       chirrtl: Circuit,
       targetAnnos: Seq[Annotation],
