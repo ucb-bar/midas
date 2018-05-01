@@ -14,7 +14,7 @@
 
 uint64_t main_time = 0;
 std::unique_ptr<mmio_t> master;
-std::unique_ptr<mmio_t> dma;
+std::unique_ptr<mmio_t> dma[4];
 
 #ifdef VCS
 midas_context_t* host;
@@ -75,12 +75,15 @@ void simif_emul_t::init(int argc, char** argv, bool log) {
       memsize = strtoll(arg.c_str() + 9, NULL, 10);
     }
   }
-
-  void* mems[1];
-  mems[0] = ::init(memsize, dramsim);
-  if (mems[0] && fastloadmem && !loadmem.empty()) {
-    fprintf(stdout, "[fast loadmem] %s\n", loadmem.c_str());
-    ::load_mem(mems, loadmem.c_str(), MEM_DATA_BITS / 8, 1);
+ 
+  for (int i=0; i<4; i++)
+  {
+    void* mems[1];
+    mems[0] = ::init(memsize, dramsim, i);
+    if (mems[0] && fastloadmem && !loadmem.empty()) {
+      fprintf(stdout, "[fast loadmem] %s\n", loadmem.c_str());
+      ::load_mem(mems, loadmem.c_str(), MEM_DATA_BITS / 8, 1);
+    }
   }
 
   signal(SIGTERM, handle_sigterm);
@@ -159,8 +162,22 @@ ssize_t simif_emul_t::pull(size_t addr, char* data, size_t size) {
   while (len >= 0) {
       size_t part_len = len % (MAX_LEN + 1);
 
-      dma->read_req(addr, DMA_SIZE, part_len);
-      wait_read(dma, data);
+      if (addr < 0x10000000) {
+         dma[0]->read_req(addr, DMA_SIZE, part_len);
+         wait_read(dma[0], data);
+      }
+      else if (addr < 0x20000000) {
+         dma[1]->read_req(addr-0x10000000, DMA_SIZE, part_len);
+         wait_read(dma[1], data);
+      }
+      else if (addr < 0x30000000) {
+         dma[2]->read_req(addr-0x20000000, DMA_SIZE, part_len);
+         wait_read(dma[2], data);
+      }
+      else {
+         dma[3]->read_req(addr-0x30000000, DMA_SIZE, part_len);
+         wait_read(dma[3], data);
+      }
 
       len -= (part_len + 1);
       addr += (part_len + 1) * DMA_WIDTH;
@@ -186,8 +203,28 @@ ssize_t simif_emul_t::push(size_t addr, char *data, size_t size) {
   while (len >= 0) {
       size_t part_len = len % (MAX_LEN + 1);
 
-      dma->write_req(addr, DMA_SIZE, part_len, data, strb_ptr);
-      wait_write(dma);
+      if (addr < 0x10000000)
+      {
+        dma[0]->write_req(addr, DMA_SIZE, part_len, data, strb_ptr);
+        wait_write(dma[0]);
+      }
+      else if (addr < 0x20000000)
+      {
+        dma[1]->write_req(addr-0x10000000, DMA_SIZE, part_len, data, strb_ptr);
+        wait_write(dma[1]);
+      }
+      else if (addr < 0x30000000)
+      {
+        dma[2]->write_req(addr-0x20000000, DMA_SIZE, part_len, data, strb_ptr);
+        wait_write(dma[2]);
+      }
+      else
+      {
+        dma[3]->write_req(addr-0x30000000, DMA_SIZE, part_len, data, strb_ptr);
+        wait_write(dma[3]);
+      }
+
+
 
       len -= (part_len + 1);
       addr += (part_len + 1) * DMA_WIDTH;

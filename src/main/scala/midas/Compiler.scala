@@ -12,6 +12,7 @@ import firrtl.passes.memlib._
 import barstools.macros._
 import freechips.rocketchip.config.{Parameters, Field}
 import java.io.{File, FileWriter, Writer}
+import scala.collection.immutable.ListMap
 
 // Directory into which output files are dumped. Set by dir argument
 case object OutputDir extends Field[File]
@@ -38,7 +39,28 @@ private class VerilogCompiler extends firrtl.Compiler {
     getLoweringTransforms(firrtl.MidForm, firrtl.LowForm) ++
     Seq(new firrtl.LowFirrtlOptimization)
 }
+/*
+// A convenience class that populates a Record with a port list, returned by Module.getPorts 
+class TargetPortRecord(portList: Seq[Port]) extends Record {
+  val elements = ListMap((for (port <- portList) yield {
+      (port.id.instanceName -> port.id.chiselCloneType)
+    }):_*)
+  override def cloneType = new TargetPortRecord(portList).asInstanceOf[this.type]
+}
 
+object TargetPortRecord {
+  def apply(mod: chisel3.experimental.RawModule, excludes: Seq[String] = Seq.empty) = {
+    // In the default case, exclude all clocks, and boots with the name reset (TODO: fix reset).
+    val portList = mod.getPorts flatMap {
+      case Port(id: Clock, _)  => None
+      case Port(id: Bool, _) if id.instanceName == "reset"  => None
+      case Port(id, _) if excludes contains id.instanceName => None
+      case keptPort => Some(keptPort)
+    }
+    new TargetPortRecord(portList)
+  }
+}
+*/
 object MidasCompiler {
   def apply(
       chirrtl: Circuit,
@@ -84,3 +106,4 @@ object MidasCompiler {
     apply(chirrtl, circuit.annotations.toSeq, io, dir, libFile, customTransforms)
   }
 }
+
