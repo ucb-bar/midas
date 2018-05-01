@@ -397,7 +397,6 @@ class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel {
     import midas.widgets.CppGenerationUtils._
     super.genHeader(base, sb)
 
-    crRegistry.genArrayHeader(wName.getOrElse(name).toUpperCase, base, sb)
   }
 
   // Prints out key elaboration time settings

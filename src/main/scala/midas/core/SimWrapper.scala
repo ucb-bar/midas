@@ -18,6 +18,7 @@ import chisel3.core.DataMirror.directionOf
 import SimUtils._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.{ArrayBuffer, HashSet}
+import freechips.rocketchip.util.HeterogeneousBag
 
 object SimUtils {
   def parsePorts(io: Data, prefix: String = "") = {
@@ -38,6 +39,7 @@ object SimUtils {
         case ActualDirection.Output => outputs += (b -> name)
       }
     }
+
     loop(prefix, io)
     (inputs.toList, outputs.toList)
   }
@@ -102,6 +104,11 @@ class SimWrapperIO(io: TargetBoxIO)
         case v: Vec[_] => v.zipWithIndex foreach {
           case (e, i) => findEndpoint(s"${name}_${i}", e)
         }
+/*
+        case h: HeterogeneousBag[AXI4Bundle] => h.elements foreach {
+          case (n, e) => findEndpoint(s"${name}_${n}", e)
+        }
+*/
         case _ =>
       }
     }
