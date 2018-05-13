@@ -11,8 +11,8 @@ import midas.core.DMANastiKey
 case object AXIDebugPrint extends Field[Boolean]
 
 class F1ShimIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
+  val dma    = midas.core.DMAIO()
   val master = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(MasterNastiKey) })))
-  val dma    = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
   val slave  = new NastiIO()(p alterPartial ({ case NastiKey => p(SlaveNastiKey) }))
 }
 

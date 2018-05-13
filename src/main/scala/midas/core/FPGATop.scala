@@ -15,9 +15,16 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 case object MemNastiKey extends Field[NastiParameters]
 case object DMANastiKey extends Field[NastiParameters]
 case object FpgaMMIOSize extends Field[BigInt]
+case object HasInitTokens extends Field[Boolean]
+
+object DMAIO {
+  def apply()(implicit p: Parameters): NastiIO = {
+    Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
+  }
+}
 
 class FPGATopIO(implicit p: Parameters) extends WidgetIO {
-  val dma  = Flipped(new NastiIO()(p alterPartial ({ case NastiKey => p(DMANastiKey) })))
+  val dma = DMAIO()
   val mem = new NastiIO()(p alterPartial ({ case NastiKey => p(MemNastiKey) }))
 }
 
@@ -84,7 +91,8 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
           case ActualDirection.Input =>
             import chisel3.core.ExplicitCompileOptions.NotStrict // to connect nasti & axi4
             channel.target <> target
-            channel.host.hValid := port.fromHost.hValid || simResetNext
+            channel.host.hValid := port.fromHost.hValid ||
+              (if (p(HasInitTokens)) simResetNext else false.B)
             ready += channel.host.hReady
           case ActualDirection.Output =>
             import chisel3.core.ExplicitCompileOptions.NotStrict // to connect nasti & axi4
@@ -103,8 +111,9 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
         case ActualDirection.Input =>
           val channels = simIo.getIns(wire)
           channels.zipWithIndex foreach { case (in, i) =>
-            in.bits  := target >> UInt(i * simIo.channelWidth)
-            in.valid := port.fromHost.hValid || simResetNext
+            in.bits  := target >> (i * simIo.channelWidth).U
+            in.valid := port.fromHost.hValid ||
+              (if (p(HasInitTokens)) simResetNext else false.B)
           }
           ready ++= channels map (_.ready)
         case ActualDirection.Output =>
@@ -130,10 +139,10 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
     arb.io.master(memIoSize) <> loadMem.io.toSlaveMem
   }
 
-  val dmaPorts = new ListBuffer[NastiIO]
+  val dmaPorts = ListBuffer[NastiIO]()
 
   // Instantiate endpoint widgets
-  defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
+  defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft true.B){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {
         case (_: SimMemIO, Some(_)) => s"MemModel_$i"
@@ -162,6 +171,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
       widget.io.tReset <> resetQueue.io.deq
       resetQueue.io.enq.bits := defaultIOWidget.io.tReset.bits
       resetQueue.io.enq.valid := defaultIOWidget.io.tReset.valid
+      when(false.B) { printf("%d", resetQueue.io.count) }
       ready && resetQueue.io.enq.ready
     }
   }

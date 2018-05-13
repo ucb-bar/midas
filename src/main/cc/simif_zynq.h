@@ -18,7 +18,11 @@ class simif_zynq_t: public virtual simif_t
   protected:
     virtual void write(size_t addr, uint32_t data);
     virtual uint32_t read(size_t addr);
-    virtual size_t pread(size_t addr, char* data, size_t size) {
+    virtual ssize_t push(size_t addr, char* data, size_t size) {
+      // Not supported
+      return 0;
+    }
+    virtual ssize_t pull(size_t addr, char* data, size_t size) {
       // Not supported
       return 0;
     }

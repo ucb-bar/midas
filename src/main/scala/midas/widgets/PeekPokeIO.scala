@@ -92,12 +92,14 @@ class PeekPokeIOWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
   io.step.ready := io.idle
 
   // Target reset connection
-  // Hack: insert high to resetQueue as initial tokens
-  val resetNext = RegNext(reset)
-  io.tReset.bits := resetNext || io.ins(0).bits(0)
-  io.tReset.valid := resetNext || io.ins(0).valid
-
-  genCRFile()
+  if (io.ins.nonEmpty) {
+    io.tReset.bits := io.ins(0).bits(0)
+    io.tReset.valid := io.ins(0).valid
+    genCRFile()
+  } else {
+    io.tReset := chisel3.core.DontCare
+    io.ctrl   := chisel3.core.DontCare
+  }
 
   override def genHeader(base: BigInt, sb: StringBuilder): Unit = {
     import CppGenerationUtils._

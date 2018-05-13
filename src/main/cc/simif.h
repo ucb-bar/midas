@@ -62,8 +62,8 @@ class simif_t
 
     inline void poke(size_t id, data_t value) {
       if (log) fprintf(stderr, "* POKE %s.%s <- 0x%x *\n",
-        TARGET_NAME, INPUT_NAMES[id], value);
-      write(INPUT_ADDRS[id], value);
+        TARGET_NAME, ((const char*)INPUT_NAMES)[id], value);
+      write(((unsigned int*)INPUT_ADDRS)[id], value);
     }
 
     inline data_t peek(size_t id) {

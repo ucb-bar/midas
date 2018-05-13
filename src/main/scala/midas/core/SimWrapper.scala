@@ -345,7 +345,7 @@ class SimWrapper(targetIo: Seq[Data])
   // Cycles for debug
   val cycles = Reg(UInt(64.W))
   when (fire) {
-    // cycles := Mux(target.io.reset, UInt(0), cycles + UInt(1))
+    cycles := Mux(targetReset.toBool, 0.U, cycles + 1.U)
     when(false.B) { printf("%d", cycles) }
   }
 } 
