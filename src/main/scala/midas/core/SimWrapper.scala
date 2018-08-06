@@ -11,6 +11,9 @@ import junctions.NastiIO
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import freechips.rocketchip.config.{Parameters, Field}
 
+
+import chisel3.core.ExplicitCompileOptions.NotStrict
+
 import chisel3._
 import chisel3.util._
 import chisel3.core.{ActualDirection, Reset}
@@ -207,6 +210,7 @@ class TargetBoxIO(targetIo: Seq[Data]) extends Record {
 
 // this gets replaced with the real target
 class TargetBox(targetIo: Seq[Data]) extends BlackBox {
+  println(targetIo)
   val io = IO(new TargetBoxIO(targetIo))
 }
 
