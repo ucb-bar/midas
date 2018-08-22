@@ -55,8 +55,9 @@ void simif_t::init(int argc, char** argv, bool log) {
 }
 
 
-void simif_t::target_into_reset() {
+void simif_t::target_into_reset_and_steps(int steps) {
     poke(reset, 1);
+    take_steps(steps, true);
 }
 
 void simif_t::target_outof_reset() {

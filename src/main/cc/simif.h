@@ -103,7 +103,7 @@ class simif_t
     void target_reset(int pulse_start = 1, int pulse_length = 5);
 
     // manually bring into and out of reset
-    void target_into_reset();
+    void target_into_reset_and_steps(int steps);
 
     void target_outof_reset();
 
