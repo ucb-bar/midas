@@ -56,7 +56,7 @@ void simif_t::init(int argc, char** argv, bool log) {
 
 
 void simif_t::target_into_reset() {
-  poke(reset, 1);
+    poke(reset, 1);
 }
 
 void simif_t::target_outof_reset() {
