@@ -199,7 +199,7 @@ abstract class SplitTransactionMMRegIO(cfg: BaseConfig) extends MMRegIO(cfg) {
 abstract class SplitTransactionModelIO(implicit p: Parameters)
     extends TimingModelIO()(p) {
   // This sub-bundle contains all the programmable fields of the model
-  val mmReg: SplitTransactionMMRegIO
+  val mmReg: SplitTransactionMMRegIO		// similar with C++ inheritance??
 }
 
 abstract class SplitTransactionModel(cfg: BaseConfig)(implicit p: Parameters)
