@@ -52,6 +52,57 @@ class DualQueue[T <: Data](gen: =>T, entries: Int) extends Module {
   }
 }
 
+class DualQueuePCRAM[T <: Data](gen: =>T, entries: Int) extends Module {
+  val io = IO(new Bundle {
+    val enqA = Flipped(Decoupled(gen.cloneType))
+    val enqB = Flipped(Decoupled(gen.cloneType))
+    val deq = Decoupled(gen.cloneType)
+    val next = Valid(gen.cloneType)
+  })
+
+  val qA = Module(new Queue(gen.cloneType, (entries+1)/2))
+  val qB = Module(new Queue(gen.cloneType, entries/2))
+
+  val enqPointer = RegInit(false.B)
+  when (io.enqA.fire() ^ io.enqB.fire()) {
+    enqPointer := ~enqPointer
+  }
+
+  qA.io.enq.bits := Mux(enqPointer ^ ~io.enqA.valid, io.enqB.bits, io.enqA.bits)
+  qA.io.enq.valid := Mux(enqPointer ^ ~io.enqA.valid, io.enqB.valid, io.enqA.valid)
+  qB.io.enq.bits := Mux(enqPointer ^ ~io.enqA.valid, io.enqA.bits, io.enqB.bits)
+  qB.io.enq.valid := Mux(enqPointer ^ ~io.enqA.valid, io.enqA.valid, io.enqB.valid)
+  io.enqA.ready := Mux(enqPointer ^ ~io.enqA.valid, qB.io.enq.ready, qA.io.enq.ready)
+  io.enqB.ready := Mux(enqPointer ^ ~io.enqA.valid, qA.io.enq.ready, qB.io.enq.ready)
+
+  /*
+  when(enqPointer ^ ~io.enqA.valid){
+    qA.io.enq <> io.enqB
+    qB.io.enq <> io.enqA
+  }.otherwise{
+    qA.io.enq <> io.enqA
+    qB.io.enq <> io.enqB
+  }
+  */
+
+  val deqPointer = RegInit(false.B)
+  when (io.deq.fire()) {
+    deqPointer := ~deqPointer
+  }
+
+  when(deqPointer){
+    io.deq <> qB.io.deq
+    qB.io.deq.ready := io.deq.ready
+    qA.io.deq.ready := false.B
+    io.next <> D2V(qA.io.deq)
+  }.otherwise{
+    io.deq <> qA.io.deq
+    qA.io.deq.ready := io.deq.ready
+    qB.io.deq.ready := false.B
+    io.next <> D2V(qB.io.deq)
+  }
+}
+
 class ProgrammableSubAddr(maskBits: Int, longName: String) extends Bundle with HasProgrammableRegisters{
   val offset = UInt(32.W) // TODO:fixme
   val mask = UInt(maskBits.W) // Must be contiguous high bits starting from LSB
@@ -65,7 +116,7 @@ class ProgrammableSubAddr(maskBits: Int, longName: String) extends Bundle with H
 
   val registers = Seq(
     (offset -> RuntimeSetting(8,s"${longName} Offset", min = 0)),
-    (mask   -> RuntimeSetting(7,s"${longName} Mask", max = Some((1 << maskBits) - 1)))
+    (mask   -> RuntimeSetting(63,s"${longName} Mask", max = Some((1 << maskBits) - 1)))
   )
 
   def forceSettings(offsetValue: BigInt, maskValue: BigInt) {

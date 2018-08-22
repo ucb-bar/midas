@@ -109,6 +109,7 @@ class MidasMemModel(cfg: BaseConfig)(implicit p: Parameters) extends MemModel
   val ingress = Module(new IngressModule(cfg))
   io.host_mem.aw <> ingress.io.nastiOutputs.aw
   io.host_mem.ar <> ingress.io.nastiOutputs.ar
+  ingress.io.nastiOutputs.ar.ready := io.host_mem.ar.ready
   io.host_mem.w  <> ingress.io.nastiOutputs.w
 
   val readEgress = Module(new ReadEgress(
