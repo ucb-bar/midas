@@ -102,7 +102,9 @@ class IngressModule(val cfg: BaseConfig)(implicit val p: Parameters) extends Mod
 
   // FIFO that tracks the relative order of reads and writes are they are received 
   // bit 0 = Read, bit 1 = Write
-  val xaction_order = Module(new DualQueuePCRAM(Bool(), cfg.maxReads + cfg.maxWrites))
+  // Change DualQueue to DualQueuePCRAM to remove deadlock problem
+  //val xaction_order = Module(new DualQueuePCRAM(Bool(), cfg.maxReads + cfg.maxWrites))
+  val xaction_order = Module(new DualQueue(Bool(), cfg.maxReads + cfg.maxWrites))
   xaction_order.io.enqA.valid := read_req_done
   xaction_order.io.enqA.bits := true.B
   xaction_order.io.enqB.valid := write_req_done
