@@ -88,6 +88,10 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
   xactionQueuesWrite.io.enq.bits.decode(nastiReq.aw.bits, io.mmReg)
   nastiReq.aw.ready := xactionQueuesWrite.io.enq.ready
 
+  // TODO: Taeksang -- decide how you want to model W channel backpressure.
+  // This cannot be left unconnected.
+  nastiReq.w.ready := true.B
+
 
 	//** 2nd-stage waiting queues to split the requests to the dedicated bank queues **//
   // Queue definition  
@@ -118,8 +122,9 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
   // Allocate urgent command from Read/Write queues to Urgent queue
 
   val relocateUrgent = perBankQueuesRead.zip(perBankQueuesWrite) map({case(readqueue, writequeue ) =>
-    val urgent = (tCycle >= readqueue.io.deq.bits.latency && readqueue.io.deq.valid) || (tCycle >=writequeue.io.deq.bits.latency && writequeue.io.deq.valid) 
-    urgent}) reduce { _ || _}
+    (tCycle >= readqueue.io.deq.bits.latency && readqueue.io.deq.valid) ||
+    (tCycle >= writequeue.io.deq.bits.latency && writequeue.io.deq.valid)
+  }) reduce { _ || _}
   //val thereExistUrgent = validForUrgent map {_.valid} reduce { _ || _ }
 
   /*
@@ -139,8 +144,11 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
     }
   })
   */
-  perBankQueuesUrgent foreach{ urgentqueue =>
+  perBankQueuesUrgent foreach { urgentqueue =>
     urgentqueue.io.enq.valid := false.B
+    // I DontCare-ed this because the more recent version of firrtl checks more aggresively
+    // that all inputs to modules are driven. Without out this we get a FIRRTL compilation error
+    urgentqueue.io.enq.bits := DontCare
   }
 
   /*
@@ -226,8 +234,10 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
 
   // Dump the command stream
   val cmdMonitor = Module(new PCRAMCommandBusMonitor(cfg.pcramKey))
-  //cmdMonitor.io.cmd := selectedCmd
-  //cmdMonitor.io.rank := cmdRank
+  // Biancolin: See comment above
+  cmdMonitor.io.cmd := DontCare
+  cmdMonitor.io.rank := DontCare
+  cmdMonitor.io.bank := DontCare
     
   /*
   backend.io.newRead.valid := thereExistsAValidRead || (thereExistsAValidUrgent && !selectorUrgent.io.out.bits.xaction.isWrite) 
