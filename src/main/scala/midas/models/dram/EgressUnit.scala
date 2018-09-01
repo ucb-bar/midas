@@ -7,6 +7,8 @@ import freechips.rocketchip.config.{Parameters, Field}
 import junctions._
 import midas.widgets._
 
+import chisel3.experimental.dontTouch
+
 /** A simple freelist
   * @param entries The number of IDS to be managed by the free list
   *
@@ -249,6 +251,8 @@ class ReadEgress(maxRequests: Int, maxReqLength: Int, maxReqsPerId: Int)
     rob.io.next.valid := ~enqPIdReg.valid && io.enq.valid
     enqPId.bits := Mux(enqPIdReg.valid, enqPIdReg.bits, rob.io.next.pId)
     enqPId.valid := enqPIdReg.valid || rob.io.next.ready
+    dontTouch(enqPIdReg.valid)
+    dontTouch(enqPIdReg)
     when (io.enq.fire()) {
       when (io.enq.bits.last) {
         enqPIdReg.valid := false.B

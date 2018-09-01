@@ -12,6 +12,7 @@ import midas.core._
 import midas.widgets._
 
 import Console.{UNDERLINED, RESET}
+import chisel3.experimental.dontTouch
 
 // Automatically bound to simulation-memory-mapped. registers Extends this
 // bundle to add additional programmable values and instrumentation
@@ -99,6 +100,7 @@ abstract class TimingModel(val cfg: BaseConfig)(implicit val p: Parameters) exte
   val pendingReads = SatUpDownCounter(cfg.maxReads)
   pendingReads.inc := tNasti.ar.fire()
   pendingReads.dec := tNasti.r.fire() && tNasti.r.bits.last
+  dontTouch(pendingReads)
 
   val pendingAWReq = SatUpDownCounter(cfg.maxWrites)
   pendingAWReq.inc := tNasti.aw.fire()

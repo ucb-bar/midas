@@ -19,17 +19,18 @@ import scala.io.Source
 
 
 trait HasPCRAMModelConstants {
-  val maxPCRAMTimingBits = 7 // width of a PCRAM timing
+  val maxPCRAMTimingBits = 32 // width of a PCRAM timing
+  //val maxPCRAMTimingBits = 63 // width of a PCRAM timing
   val numBankStates = 3     // for idle, read and write
   //val numBankStates = 2       // for idle or active
-  val numRankStates = 2
+  val numRankStates = 3
 }
 
 object PCRAMModelEnums extends HasPCRAMModelConstants {
   val cmd_nop :: cmd_read :: cmd_write :: Nil = Enum(3)
   val bank_idle :: bank_read :: bank_write :: Nil = Enum(numBankStates)
-  //val bank_idle :: bank_active :: Nil = Enum(numBankStates)
-  val rank_idle :: rank_active :: Nil = Enum(numRankStates)
+  val rank_idle :: rank_read :: rank_write :: Nil = Enum(numRankStates)
+  val writeMode :: readMode :: Nil = Enum(2)
 }
 
 
@@ -40,36 +41,51 @@ class PCRAMProgrammableTimings extends Bundle with HasPCRAMModelConstants with H
   // The most vanilla of PCRAM timings
   val tREAD      				= UInt(maxPCRAMTimingBits.W)
   val tWRITE     				= UInt(maxPCRAMTimingBits.W)
-  val tTHRESHOLDREAD     = UInt(maxPCRAMTimingBits.W)
-  val tTHRESHOLDWRITE    = UInt(maxPCRAMTimingBits.W)
+  val tTHRESHOLDREAD    = UInt(maxPCRAMTimingBits.W)
+  val tTHRESHOLDWRITE   = UInt(maxPCRAMTimingBits.W)
   val tWTR_PCRAM 				= UInt(maxPCRAMTimingBits.W)
   val tCCD_PCRAM 				= UInt(maxPCRAMTimingBits.W)
+  val tRTRS_PCRAM 		  = UInt(maxPCRAMTimingBits.W)
+  val tCWD_PCRAM 				= UInt(maxPCRAMTimingBits.W)
+  val tCAS_PCRAM 				= UInt(maxPCRAMTimingBits.W)
 
   // Defaults are set to sg093, x8, 2048Mb density (1GHz clock)
   
   val registers = Seq(
-		(tREAD						-> RuntimeSetting(40,
+		(tREAD						-> RuntimeSetting(60,
 																				"Read Latency",
 																				min = 1,
 																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
-		(tWRITE						-> RuntimeSetting(1000,
+		(tWRITE						-> RuntimeSetting(300,
 																				"Write Latency",
 																				min = 1,
 																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
-		(tTHRESHOLDREAD		-> RuntimeSetting(500,
-																				"Read Latency",
+		(tTHRESHOLDREAD		-> RuntimeSetting(200,
+																				"Waiting-Time to Set Urgent for Read Request",
 																				min = 1,
 																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
-		(tTHRESHOLDWRITE		-> RuntimeSetting(5000,
-																				"Write Latency",
+		(tTHRESHOLDWRITE		-> RuntimeSetting(1000,
+																				"Waiting-Time to Set Urgent for Write Request",
 																				min = 1,
 																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
 		(tCCD_PCRAM			-> RuntimeSetting(4,
-																				"CCD delay",
+																				"Command-to-Command delay",
+																				min = 0,
+																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
+		(tRTRS_PCRAM			-> RuntimeSetting(2,
+																				"Rank-to-Rank Switching Time",
+																				min = 0,
+																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
+		(tCWD_PCRAM			-> RuntimeSetting(10,
+																				"Write CAS Latency: WR to data valid on bus from MC",
+																				min = 0,
+																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
+		(tCAS_PCRAM			-> RuntimeSetting(14,
+																				"CAS Latency: RD to data valid on data bus",
 																				min = 0,
 																				max = Some((1 << (maxPCRAMTimingBits-1))-1))),
 		(tWTR_PCRAM				-> RuntimeSetting(8,
-																				"Write to Read Time",
+																				"Write to Read Turnaround Time",
 																				max = Some((1 << (maxPCRAMTimingBits-1))-1)))
 	)
 																				
@@ -87,22 +103,22 @@ abstract class PCRAMBaseConfig( baseParams: BaseParams) extends BaseConfig(baseP
 
 abstract class BasePCRAMMMRegIO(cfg: PCRAMBaseConfig) extends MMRegIO(cfg) with HasConsoleUtils {
   // Addr assignment
-  val bankAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.bankBits, "Bank Address", 8, 63))
-  //val rankAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.rankBits, "Rank Address"))
-  val rowAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.rowBits, "Row Address", 8, 63))
+  val bankAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.bankBits, "Bank Address", 8, 15))
+  val rankAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.rankBits, "Rank Address", 12, 3))
+  val rowAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.rowBits, "Row Address", 14, 63))
 
   // Additional latency added to read data beats after it's received from the devices
   val backendLatency = Input(UInt(cfg.backendKey.latencyBits.W))
   val frontendLatency = Input(UInt(cfg.backendKey.latencyBits.W))
 
   val pcramTimings = Input(new PCRAMProgrammableTimings())
-  //val rankPower = Output(Vec(cfg.pcramKey.maxRanks, new PCRAMRankPowerIO))
-  val rankPower = Output(new PCRAMRankPowerIO)
+  val rankPower = Output(Vec(cfg.pcramKey.maxRanks, new PCRAMRankPowerIO))
+  //val rankPower = Output(new PCRAMRankPowerIO)
 
 
   // END CHISEL TYPES
   val pcramBaseRegisters = Seq(
-    (backendLatency -> RuntimeSetting(2,
+    (backendLatency -> RuntimeSetting(1,
                                       "Backend Latency",
                                       min = 1,
                                       max = Some(1 << (cfg.backendKey.latencyBits - 1)))),
@@ -214,14 +230,15 @@ abstract class BasePCRAMMMRegIO(cfg: PCRAMBaseConfig) extends MMRegIO(cfg) with 
     Console.println(s"\n${UNDERLINED}Address assignment${RESET}")
     val lineSize = requestInput("Line size in Bytes", 64)
 
-    val numBanks = 64  // DDR3 Mandated
+    val numBanks = 16  // DDR3 Mandated
+    //val numRanks = 4  // DDR3 Mandated
     val pageSize = ((BigInt(1) << lut("COL_BITS").value.toInt) * devicesPerRank * dqWidth ) / 8
     val numRows = BigInt(1) << lut("ROW_BITS").value.toInt
     getAddressScheme(numRanks, numBanks,  numRows, lineSize, pageSize)
   }
 }
 
-case class PCRAMOrganizationKey(maxBanks: Int, maxRanks: Int, maxActBanks: Int, pcramSize: BigInt, lineBits: Int = 8) {
+case class PCRAMOrganizationKey(maxBanks: Int, maxRanks: Int, maxActBanks: Int, maxWriteBanks: Int, pcramSize: BigInt, lineBits: Int = 8) {
   require(isPow2(maxBanks))
   require(isPow2(maxRanks))
   require(isPow2(pcramSize))
@@ -236,6 +253,8 @@ case class PCRAMOrganizationKey(maxBanks: Int, maxRanks: Int, maxActBanks: Int, 
 
 trait PCRAMCommandLegalBools {
   val canACT  = Output(Bool())
+  val canREAD = Output(Bool())
+  val canWRITE = Output(Bool())
 }
 
 trait HasPCRAMLegalityUpdateIO {
@@ -258,14 +277,14 @@ class PCRAMModelEntry(key: PCRAMBaseConfig)(implicit p: Parameters) extends Nast
   val latency = UInt(maxPCRAMTimingBits.W)
   val bankAddrOH = UInt(key.pcramKey.maxBanks.W)
   val bankAddr = UInt(key.pcramKey.bankBits.W)
-  //val rankAddrOH = UInt(key.pcramKey.maxRanks.W)
-  //val rankAddr = UInt(key.pcramKey.rankBits.W)
+  val rankAddrOH = UInt(key.pcramKey.maxRanks.W)
+  val rankAddr = UInt(key.pcramKey.rankBits.W)
 
   def decode(from: NastiAddressChannel, mmReg: BasePCRAMMMRegIO) {
     bankAddr := mmReg.bankAddr.getSubAddr(addr)
     bankAddrOH := UIntToOH(bankAddr)
-    //rankAddr := mmReg.rankAddr.getSubAddr(addr)
-    //rankAddrOH := UIntToOH(rankAddr)
+    rankAddr := mmReg.rankAddr.getSubAddr(addr)
+    rankAddrOH := UIntToOH(rankAddr)
   }
   //val bankAddr = WireInit(UInt(key.pcramKey.bankBits.W), init=mmReg.bankAddr.getSubAddr(addr))
   //val bankAddrOH = WireInit(UInt(key.pcramKey.maxBanks.W), init=UIntToOH(bankAddr))
@@ -274,6 +293,12 @@ class PCRAMModelEntry(key: PCRAMBaseConfig)(implicit p: Parameters) extends Nast
 
 
   override def cloneType = new PCRAMModelEntry(key)(p).asInstanceOf[this.type]
+}
+
+class PCRAMModelLegalEntry(key: PCRAMBaseConfig)(implicit p: Parameters) extends PCRAMModelEntry(key)(p) {
+  val canACT = Bool()
+
+  override def cloneType = new PCRAMModelLegalEntry(key)(p).asInstanceOf[this.type]
 }
 
 // Tracks the state of a bank, including:
@@ -335,20 +360,14 @@ class PCRAMBankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPC
     }
   }
   
-	////// need to check !!!
-  /*.elsewhen(nextLegalACT.io.idle) {
-    state := bank_idle
-    internalState := 0.U
-  }*/
-  
   when(nextLegalACT.io.current ===1.U) {
     state := bank_idle
     internalState := 0.U
   }
 
-  //io.out.canACT := nextLegalACT.io.idle
   io.out.canACT := state === bank_idle
-  //io.out.canACT := internalState === 0.U
+  io.out.canREAD := state === bank_idle
+  io.out.canWRITE := state === bank_idle
   io.out.state := state 
 }
 
@@ -356,12 +375,6 @@ class PCRAMBankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPC
 // Tracks the state of a rank, including:
 //   - Whether READ and WRITE commands can be legally issued
 //
-// A PCRAM model uses these trackers to filte out illegal instructions for this bank
-//
-// A necessary condition for the controller to issue a CMD that uses this bank
-// is that the can{CMD} bit be high. The controller of course all extra-bank
-// timing and resource constraints are met. The controller must also ensure CAS
-// commands use the open ROW. 
 
 class PCRAMRankStateTrackerO(key: PCRAMOrganizationKey) extends GenericParameterizedBundle(key)
     with PCRAMCommandLegalBools {
@@ -383,38 +396,62 @@ class PCRAMRankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPC
 
   val io = IO(new PCRAMRankStateTrackerIO(key))
 
+  val state = RegInit(rank_idle)
+  /*
   val nextLegalACT = Module(new DownCounter(maxPCRAMTimingBits))
   nextLegalACT.io.decr := true.B
   nextLegalACT.io.set.valid := false.B
   nextLegalACT.io.set.bits := DontCare
-  val state = RegInit(rank_idle)
+  */
+  //val wasRead = Mux(io.selectedCmd === cmd_read,  
+  //val cmdChecker = Module(new Queue( Bool(), 1, pipe=true))
+
+  //val nextLegalACT = Module(new DownCounter(maxPCRAMTimingBits))
+  val nextLegalREAD = Module(new DownCounter(maxPCRAMTimingBits))
+  val nextLegalWRITE = Module(new DownCounter(maxPCRAMTimingBits))
+
+  Seq( nextLegalREAD, nextLegalWRITE) foreach { mod =>
+    mod.io.decr := true.B
+    mod.io.set.valid := false.B
+    mod.io.set.bits := DontCare
+  }
 
   // need to modify for signle counter
 
-  when (io.cmdUsesThisRank) {
+  //when (io.cmdUsesThisRank) {
     switch(io.selectedCmd) {
       is(cmd_read) {
-        assert(io.rank.canACT, "Bank Timing Violation: Controller issued read command illegally: need to keep tCMD/tCCD")
-        state := rank_active
-        nextLegalACT.io.set.valid := true.B
-        nextLegalACT.io.set.bits := io.timings.tCCD_PCRAM - 1.U
+        assert(!io.cmdUsesThisRank || io.rank.canREAD, "Bank Timing Violation: Controller issued read command illegally: need to keep tCMD/tCCD")
+        state := rank_read
+        nextLegalREAD.io.set.valid := true.B
+        nextLegalREAD.io.set.bits := io.timings.tCCD_PCRAM - 1.U + 
+          Mux(io.cmdUsesThisRank, 0.U, io.timings.tRTRS_PCRAM)
+        nextLegalWRITE.io.set.valid := true.B
+        nextLegalWRITE.io.set.bits := io.timings.tCCD_PCRAM - 1.U + io.timings.tCAS_PCRAM - io.timings.tCWD_PCRAM
       }
       is(cmd_write) {
-        assert(io.rank.canACT, "Bank Timing Violation: Controller issued write command illegally: need to keep tCMD/tCCD")
-        state := rank_active
-        nextLegalACT.io.set.valid := true.B
-        nextLegalACT.io.set.bits := io.timings.tCCD_PCRAM - 1.U
+        assert(!io.cmdUsesThisRank || io.rank.canWRITE, "Bank Timing Violation: Controller issued write command illegally: need to keep tCMD/tCCD")
+        state := rank_write
+        nextLegalREAD.io.set.valid := true.B
+        nextLegalREAD.io.set.bits := Mux(io.cmdUsesThisRank,
+          io.timings.tCCD_PCRAM + io.timings.tWTR_PCRAM + io.timings.tCWD_PCRAM - 1.U,
+          io.timings.tCCD_PCRAM + io.timings.tWTR_PCRAM + io.timings.tCWD_PCRAM + io.timings.tRTRS_PCRAM - 1.U)
+        /*
+        nextLegalREAD.io.set.bits := Mux(io.cmdUsesThisRank,
+          io.timings.tCCD_PCRAM + io.timings.tWTR_PCRAM + io.timings.tCWD_PCRAM - 1.U,
+          io.timings.tCCD_PCRAM + io.timings.tCWD_PCRAM + io.timings.tRTRS_PCRAM - io.timings.tCAS_PCRAM - 1.U)
+          */
+        nextLegalWRITE.io.set.valid := true.B
+        nextLegalWRITE.io.set.bits := io.timings.tCCD_PCRAM - 1.U
       }
     }
-  }
+  //}
 
-	////// need to check !!!
+  /*
   when(nextLegalACT.io.current === 1.U) {
     state := rank_idle
   }
-
-	// no refresh for PCRAM -> ideally, can apply any command to rank
-  //val nextLegalACT = Module(new DownCounter(tRFCBits))
+  */
 
   val bankTrackers = Seq.fill(key.maxBanks)(Module(new PCRAMBankStateTracker(key)).io)
 
@@ -429,6 +466,8 @@ class PCRAMRankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPC
   io.rank.state := state
 	//io.rank.canACT := nextLegalACT.io.idle
 	io.rank.canACT := state === rank_idle 
+  io.rank.canREAD := nextLegalREAD.io.idle
+  io.rank.canWRITE := nextLegalWRITE.io.idle
 }
 
 
