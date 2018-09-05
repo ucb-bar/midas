@@ -78,7 +78,8 @@ class LLCProgrammableSettings(llcKey: LLCParams) extends Bundle
   val registers = Seq(
     wayBits   -> RuntimeSetting(3, "Log2(ways per set)"),
     setBits   -> RuntimeSetting(9, "Log2(sets per bank"),
-    blockBits -> RuntimeSetting(6, "Log2(cache-block bytes")
+    //blockBits -> RuntimeSetting(6, "Log2(cache-block bytes")
+    blockBits -> RuntimeSetting(7, "Log2(cache-block bytes")
   )
 
   def maskTag(addr: UInt): UInt = (addr >> (blockBits +& setBits))
@@ -112,7 +113,7 @@ case class WRange(min: Int, max: Int) {
 case class LLCParams(
     ways: WRange       = WRange(1, 8),
     sets: WRange       = WRange(32, 4096),
-    blockBytes: WRange = WRange(8, 128),
+    blockBytes: WRange = WRange(8, 256),
     mshrs: WRange      = WRange(1, 8)// TODO: check against AXI ID width
   ) {
 

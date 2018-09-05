@@ -97,7 +97,7 @@ class PCRAMProgrammableTimings extends Bundle with HasPCRAMModelConstants with H
 case class PCRAMBackendKey(writeDepth: Int, readDepth: Int, latencyBits: Int)
 
 abstract class PCRAMBaseConfig( baseParams: BaseParams) extends BaseConfig(baseParams) with HasPCRAMModelConstants {
-  def pcramKey: PCRAMOrganizationKey
+  def pcramKey: PCRAMOrganizationParams
   def backendKey: PCRAMBackendKey
 }
 
@@ -238,7 +238,7 @@ abstract class BasePCRAMMMRegIO(cfg: PCRAMBaseConfig) extends MMRegIO(cfg) with 
   }
 }
 
-case class PCRAMOrganizationKey(maxBanks: Int, maxRanks: Int, maxActBanks: Int, maxWriteBanks: Int, pcramSize: BigInt, lineBits: Int = 8) {
+case class PCRAMOrganizationParams(maxBanks: Int, maxRanks: Int, maxActBanks: Int, maxWriteBanks: Int, pcramSize: BigInt, lineBits: Int = 8) {
   require(isPow2(maxBanks))
   require(isPow2(maxRanks))
   require(isPow2(pcramSize))
@@ -258,7 +258,7 @@ trait PCRAMCommandLegalBools {
 }
 
 trait HasPCRAMLegalityUpdateIO {
-  val key: PCRAMOrganizationKey
+  val key: PCRAMOrganizationParams
   import PCRAMModelEnums._
   val timings = Input(new PCRAMProgrammableTimings)
   val selectedCmd = Input(cmd_nop.cloneType)
@@ -312,7 +312,7 @@ class PCRAMModelLegalEntry(key: PCRAMBaseConfig)(implicit p: Parameters) extends
 // timing and resource constraints are met. The controller must also ensure CAS
 // commands use the open ROW. 
 
-class PCRAMBankStateTrackerO(key: PCRAMOrganizationKey) extends GenericParameterizedBundle(key)
+class PCRAMBankStateTrackerO(key: PCRAMOrganizationParams) extends GenericParameterizedBundle(key)
     with PCRAMCommandLegalBools {
 
   import PCRAMModelEnums._
@@ -320,13 +320,13 @@ class PCRAMBankStateTrackerO(key: PCRAMOrganizationKey) extends GenericParameter
   val state = Output(bank_idle.cloneType)
 }
 
-class PCRAMBankStateTrackerIO(val key: PCRAMOrganizationKey) extends GenericParameterizedBundle(key)
+class PCRAMBankStateTrackerIO(val key: PCRAMOrganizationParams) extends GenericParameterizedBundle(key)
   with HasPCRAMLegalityUpdateIO {
   val out = new PCRAMBankStateTrackerO(key)
   val cmdUsesThisBank = Input(Bool())
 }
 
-class PCRAMBankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPCRAMModelConstants {
+class PCRAMBankStateTracker(key: PCRAMOrganizationParams) extends Module with HasPCRAMModelConstants {
   import PCRAMModelEnums._
   val io = IO(new PCRAMBankStateTrackerIO(key))
 
@@ -376,14 +376,14 @@ class PCRAMBankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPC
 //   - Whether READ and WRITE commands can be legally issued
 //
 
-class PCRAMRankStateTrackerO(key: PCRAMOrganizationKey) extends GenericParameterizedBundle(key)
+class PCRAMRankStateTrackerO(key: PCRAMOrganizationParams) extends GenericParameterizedBundle(key)
     with PCRAMCommandLegalBools {
   import PCRAMModelEnums._
   val banks = Vec(key.maxBanks, Output(new PCRAMBankStateTrackerO(key)))
   val state = Output(rank_idle.cloneType)
 }
 
-class PCRAMRankStateTrackerIO(val key: PCRAMOrganizationKey) extends GenericParameterizedBundle(key)
+class PCRAMRankStateTrackerIO(val key: PCRAMOrganizationParams) extends GenericParameterizedBundle(key)
     with HasPCRAMLegalityUpdateIO with HasPCRAMModelConstants {
   val rank = new PCRAMRankStateTrackerO(key)
   val tCycle = Input(UInt(maxPCRAMTimingBits.W))
@@ -391,7 +391,7 @@ class PCRAMRankStateTrackerIO(val key: PCRAMOrganizationKey) extends GenericPara
   val cmdBankOH = Input(UInt(key.maxBanks.W))
 }
 
-class PCRAMRankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPCRAMModelConstants {
+class PCRAMRankStateTracker(key: PCRAMOrganizationParams) extends Module with HasPCRAMModelConstants {
   import PCRAMModelEnums._
 
   val io = IO(new PCRAMRankStateTrackerIO(key))
@@ -471,7 +471,7 @@ class PCRAMRankStateTracker(key: PCRAMOrganizationKey) extends Module with HasPC
 }
 
 
-class PCRAMCommandBusMonitor(val key: PCRAMOrganizationKey) extends Module {
+class PCRAMCommandBusMonitor(val key: PCRAMOrganizationParams) extends Module {
   import PCRAMModelEnums._
 
 	val rankBits = log2Ceil(key.maxRanks)
@@ -536,7 +536,7 @@ object PCRAMRankPowerIO {
   }
 }
 
-class PCRAMRankPowerMonitor(key: PCRAMOrganizationKey) extends Module with HasPCRAMModelConstants {
+class PCRAMRankPowerMonitor(key: PCRAMOrganizationParams) extends Module with HasPCRAMModelConstants {
   import PCRAMModelEnums._
   val io = IO(new Bundle {
     val stats = Output(new PCRAMRankPowerIO)

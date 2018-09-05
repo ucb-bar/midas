@@ -13,11 +13,11 @@ import chisel3.experimental.dontTouch
 import midas.widgets.{SatUpDownCounter}
 
 case class PCRAMModelConfig(
-    maxBanks: Int,
-    maxRanks: Int,
-    maxActBanks: Int,
-    maxWriteBanks: Int,
-    pcramKey: PCRAMOrganizationKey,
+//    maxBanks: Int,
+//    maxRanks: Int,
+//    maxActBanks: Int,
+//    maxWriteBanks: Int,
+    pcramKey: PCRAMOrganizationParams,
     schedulerWindowSize: Int,
     transactionQueueDepth: Int,
     backendKey: PCRAMBackendKey = PCRAMBackendKey(16, 16, PCRAMModelEnums.maxPCRAMTimingBits),
@@ -144,22 +144,22 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
   */
   // Counter for throttling : total number of ACT banks & total number of Write Banks
   // Counting # of ACT and # of WRITE bank for Power Throttling 
-  val numActBanks = RegInit(0.U(log2Ceil(cfg.maxBanks*cfg.maxRanks).W))
+  val numActBanks = RegInit(0.U(log2Ceil(cfg.pcramKey.maxBanks*cfg.pcramKey.maxRanks).W))
   val actBanksPerRank = VecInit(rankStateTrackers map { perRank =>
         PopCount(perRank.io.rank.banks map {_.state =/= bank_idle})
     })
   numActBanks := actBanksPerRank.reduceLeft( _ + _ )
 
-  val numReadBanks = RegInit(0.U(log2Ceil(cfg.maxBanks*cfg.maxRanks).W))
+  val numReadBanks = RegInit(0.U(log2Ceil(cfg.pcramKey.maxBanks*cfg.pcramKey.maxRanks).W))
   val readBanksPerRank = VecInit(rankStateTrackers map { perRank =>
         PopCount(perRank.io.rank.banks map {_.state === bank_read})
     })
   numReadBanks := readBanksPerRank.reduceLeft( _ + _ )
   dontTouch(numReadBanks)
 
-  val numWriteBanks = RegInit(0.U(log2Ceil(cfg.maxBanks*cfg.maxRanks).W))
+  val numWriteBanks = RegInit(0.U(log2Ceil(cfg.pcramKey.maxBanks*cfg.pcramKey.maxRanks).W))
   val writeBanksPerRank = VecInit(rankStateTrackers map { perRank =>
-        val perRankWriteBanks = RegInit(0.U(log2Ceil(cfg.maxBanks).W))
+        val perRankWriteBanks = RegInit(0.U(log2Ceil(cfg.pcramKey.maxBanks).W))
         perRankWriteBanks := PopCount(perRank.io.rank.banks map {_.state === bank_write})
         perRankWriteBanks
     })
@@ -168,8 +168,8 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
 
   val warningPowerThrottling = RegInit(0.U(1.W))
   val warningWriteThrottling = RegInit(0.U(1.W))
-  warningPowerThrottling :=  numActBanks >= cfg.maxActBanks.U
-  warningWriteThrottling :=  numWriteBanks >= cfg.maxWriteBanks.U
+  warningPowerThrottling :=  numActBanks >= cfg.pcramKey.maxActBanks.U
+  warningWriteThrottling :=  numWriteBanks >= cfg.pcramKey.maxWriteBanks.U
   dontTouch(warningPowerThrottling)
   dontTouch(warningWriteThrottling)
 
@@ -200,14 +200,14 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
 
   commandArbiterRead.io.in <> refReadList.map({ entry =>
       val candidate = V2D(entry)
-      val couldREAD = canLegallyREAD(entry.bits) && (numActBanks < cfg.maxActBanks.U) && backend.io.newRead.ready 
+      val couldREAD = canLegallyREAD(entry.bits) && (numActBanks < cfg.pcramKey.maxActBanks.U) && backend.io.newRead.ready 
       candidate.valid := entry.valid && couldREAD && ( selectedMode === readMode)
       candidate
     })
 
   commandArbiterWrite.io.in <> refWriteList.map({ entry =>
       val candidate = V2D(entry)
-      val couldWRITE = canLegallyWRITE(entry.bits) && (numWriteBanks < cfg.maxWriteBanks.U) && backend.io.newWrite.ready 
+      val couldWRITE = canLegallyWRITE(entry.bits) && (numWriteBanks < cfg.pcramKey.maxWriteBanks.U) && backend.io.newWrite.ready 
       candidate.valid := entry.valid && couldWRITE && (selectedMode === writeMode)
       candidate
     })
@@ -220,25 +220,25 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
 
   backend.io.tCycle := tCycle
   backend.io.readLatency := timings.tREAD + io.mmReg.backendLatency
-  backend.io.newRead.valid := (numActBanks <= cfg.maxActBanks.U) && commandArbiterRead.io.out.valid 
+  backend.io.newRead.valid := (numActBanks <= cfg.pcramKey.maxActBanks.U) && commandArbiterRead.io.out.valid 
   backend.io.newRead.bits := ReadResponseMetaData(commandArbiterRead.io.out.bits.xaction) 
-  commandArbiterRead.io.out.ready := (numActBanks < cfg.maxActBanks.U) && backend.io.newRead.ready
+  commandArbiterRead.io.out.ready := (numActBanks < cfg.pcramKey.maxActBanks.U) && backend.io.newRead.ready
 
   backend.io.writeLatency := timings.tWRITE + io.mmReg.backendLatency
-  backend.io.newWrite.valid := (numActBanks < cfg.maxWriteBanks.U) && commandArbiterWrite.io.out.valid 
+  backend.io.newWrite.valid := (numActBanks < cfg.pcramKey.maxWriteBanks.U) && commandArbiterWrite.io.out.valid 
   backend.io.newWrite.bits := WriteResponseMetaData(commandArbiterWrite.io.out.bits.xaction)
-  commandArbiterWrite.io.out.ready := (numActBanks < cfg.maxWriteBanks.U) && backend.io.newWrite.ready
+  commandArbiterWrite.io.out.ready := (numActBanks < cfg.pcramKey.maxWriteBanks.U) && backend.io.newWrite.ready
 
   val cmdBank = WireInit(UInt(cfg.pcramKey.bankBits.W), init = commandArbiterRead.io.out.bits.bankAddr)
   val cmdBankOH = UIntToOH(cmdBank)
   val cmdRank = WireInit(UInt(cfg.pcramKey.rankBits.W), init = commandArbiterRead.io.out.bits.rankAddr)
   val cmdRankOH = UIntToOH(cmdRank)
   val selectedCmd = WireInit(cmd_nop)
-  when(numActBanks <= cfg.maxActBanks.U && commandArbiterWrite.io.out.valid) {
+  when(numActBanks <= cfg.pcramKey.maxActBanks.U && commandArbiterWrite.io.out.valid) {
     selectedCmd := cmd_write
     cmdBank := commandArbiterWrite.io.out.bits.bankAddr
     cmdRank := commandArbiterWrite.io.out.bits.rankAddr
-  }.elsewhen (numActBanks <= cfg.maxActBanks.U && commandArbiterRead.io.out.valid) {
+  }.elsewhen (numActBanks <= cfg.pcramKey.maxActBanks.U && commandArbiterRead.io.out.valid) {
     selectedCmd := cmd_read
     cmdBank := commandArbiterRead.io.out.bits.bankAddr
     cmdRank := commandArbiterRead.io.out.bits.rankAddr
