@@ -19,6 +19,8 @@ import SimUtils._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable.{ArrayBuffer, HashSet}
 
+import chisel3.core.ExplicitCompileOptions.NotStrict
+
 object SimUtils {
   def parsePorts(io: Data, prefix: String = "") = {
     val inputs = ArrayBuffer[(Bits, String)]()
