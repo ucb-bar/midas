@@ -54,6 +54,13 @@ void simif_t::init(int argc, char** argv, bool log) {
 #endif
 }
 
+void simif_t::target_into_reset() {
+    poke(reset, 1);
+}
+ void simif_t::target_outof_reset() {
+    poke(reset, 0);
+}
+
 void simif_t::target_reset(int pulse_start, int pulse_length) {
   poke(reset, 0);
   take_steps(pulse_start, true);
