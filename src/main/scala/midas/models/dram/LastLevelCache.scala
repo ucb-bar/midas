@@ -91,7 +91,7 @@ class LLCProgrammableSettings(llcKey: LLCParams) extends Bundle
   def setLLCSettings(bytesPerBlock: Option[Int] = None): Unit = {
     Console.println(s"\n${UNDERLINED}Last-Level Cache Settings${RESET}")
 
-    regMap(blockBits).set(log2Ceil(requestInput("Block size in bytes", 128,
+    regMap(blockBits).set(log2Ceil(requestInput("Block size in bytes", 64,
                                                 min = Some(llcKey.blockBytes.min),
                                                 max = Some(llcKey.sets.max))))
     regMap(setBits).set(log2Ceil(requestInput("Number of sets in LLC", 4096,

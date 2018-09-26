@@ -88,6 +88,23 @@ class PCRAMProgrammableTimings extends Bundle with HasPCRAMModelConstants with H
 																				"Write to Read Turnaround Time",
 																				max = Some((1 << (maxPCRAMTimingBits-1))-1)))
 	)
+
+  def setDependentRegisters(lut: Map[String, JSONField], freqMHz: BigInt) {
+    val periodPs = 1000000.0/freqMHz.toFloat
+    // Generate a lookup table of timings in units of tCK (as all programmable
+    // timings in the model are in units of the controller clock frequency
+    val lutTCK = lut.flatMap({
+      case (name , JSONField(value, "ps")) =>
+        Some(name -> BigInt(((value.toFloat + periodPs - 1)/periodPs).toInt))
+      case (name , JSONField(value, "tCK")) => Some(name -> value)
+      case _ => None
+    })
+
+    registers foreach {
+      case (elem, reg: JSONSetting) => reg.setWithLUT(lutTCK)
+      case _ => None
+    }
+  }
 																				
 	// Util.scala --> use ProgrammableSubAddr to set bankMask, bankOffset, rankMask, rankOffset,... etc
   override def cloneType = new PCRAMProgrammableTimings().asInstanceOf[this.type]

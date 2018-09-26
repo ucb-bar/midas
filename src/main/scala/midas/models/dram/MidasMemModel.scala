@@ -42,7 +42,7 @@ case class BaseParams(
   detectAddressCollisions: Boolean = false,
 
   // HOST INSTRUMENTATION
-  stallEventCounters: Boolean = false, // To track causes of target-time stalls
+  stallEventCounters: Boolean = true, // To track causes of target-time stalls
   localHCycleCount: Boolean = false, // Host Cycle Counter
   latencyHistograms: Boolean = false, // Creates a BRAM histogram of various system latencies
 
@@ -53,7 +53,7 @@ case class BaseParams(
   // BASE TIMING-MODEL INSTRUMENTATION
   xactionCounters: Boolean = true, // Numbers of read and write AXI4 xactions
   beatCounters: Boolean = false, // Numbers of read and write beats in AXI4 xactions
-  targetCycleCounter: Boolean = false, // Redundant in a full simulator; useful for testing
+  targetCycleCounter: Boolean = true, // Redundant in a full simulator; useful for testing
   // Number of xactions in flight in a given cycle or Some(Number of Bins)
   occupancyHistograms: Option[Seq[(UInt) => Bool]] = Some(
     Seq({ _ === 0.U},
