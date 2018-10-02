@@ -28,8 +28,8 @@ case class PCRAMModelConfig(
 }
 
 class PCRAMModelMMRegIO(val cfg: PCRAMModelConfig) extends BasePCRAMMMRegIO(cfg) {
-  val schedulerWindowSize = Input(UInt(log2Ceil(cfg.schedulerWindowSize).W))
-  val transactionQueueDepth = Input(UInt(log2Ceil(cfg.transactionQueueDepth).W))
+  val schedulerWindowSize = Input(UInt(log2Ceil(cfg.schedulerWindowSize*2).W))
+  val transactionQueueDepth = Input(UInt(log2Ceil(cfg.transactionQueueDepth*2).W))
 
   val registers = pcramBaseRegisters ++ Seq(
     (schedulerWindowSize -> RuntimeSetting(
