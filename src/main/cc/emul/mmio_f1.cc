@@ -101,7 +101,7 @@ std::unique_ptr<mm_t> slave[4];
 void* init(uint64_t memsize, bool dramsim, int mem_index) {
   master.reset(new mmio_f1_t(MMIO_WIDTH));
   dma[mem_index].reset(new mmio_f1_t(DMA_WIDTH));
-  slave[mem_index].reset(dramsim ? (mm_t*) new mm_dramsim2_t : (mm_t*) new mm_magic_t);
+  slave[mem_index].reset(dramsim ? (mm_t*) new mm_dramsim2_t(1 << MEM_ID_BITS) : (mm_t*) new mm_magic_t);
   slave[mem_index]->init(memsize, MEM_WIDTH, 64);
   return slave[mem_index]->get_data();
 }
@@ -994,10 +994,10 @@ void tick() {
 
   top->io_master_r_ready = m->r_ready();
   top->io_master_b_ready = m->b_ready();
-#if DMA_DATA_BITS > 64
-  memcpy(top->io_master_w_bits_data, m->w_data(), DMA_WIDTH);
+#if CTRL_DATA_BITS > 64
+  memcpy(top->io_master_w_bits_data, m->w_data(), MMIO_WIDTH);
 #else
-  memcpy(&top->io_master_w_bits_data, m->w_data(), DMA_WIDTH);
+  memcpy(&top->io_master_w_bits_data, m->w_data(), MMIO_WIDTH);
 #endif
 
   m->tick(
@@ -1006,7 +1006,7 @@ void tick() {
     top->io_master_aw_ready,
     top->io_master_w_ready,
     top->io_master_r_bits_id,
-#if DMA_DATA_BITS > 64
+#if CTRL_DATA_BITS > 64
     top->io_master_r_bits_data,
 #else
     &top->io_master_r_bits_data,
