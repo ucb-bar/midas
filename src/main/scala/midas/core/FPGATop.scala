@@ -136,6 +136,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
   val addresses = new ListBuffer[AddressSet]
 
   // Instantiate endpoint widgets
+  // from here to 175, instantiate the all memory models including DRAM and PCRAM
   defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {

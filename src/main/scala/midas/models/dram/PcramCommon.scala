@@ -106,7 +106,6 @@ class PCRAMProgrammableTimings extends Bundle with HasPCRAMModelConstants with H
     }
   }
 																				
-	// Util.scala --> use ProgrammableSubAddr to set bankMask, bankOffset, rankMask, rankOffset,... etc
   override def cloneType = new PCRAMProgrammableTimings().asInstanceOf[this.type]
 
 }
@@ -120,13 +119,29 @@ abstract class PCRAMBaseConfig( baseParams: BaseParams) extends BaseConfig(baseP
 
 abstract class BasePCRAMMMRegIO(cfg: PCRAMBaseConfig) extends MMRegIO(cfg) with HasConsoleUtils {
   // Addr assignment
-  val bankAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.bankBits, "Bank Address", 8, 15))
-  val rankAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.rankBits, "Rank Address", 12, 3))
-  val rowAddr = Input(new ProgrammableSubAddr(cfg.pcramKey.rowBits, "Row Address", 14, 63))
+  val pcramBankAddr = Input(new ProgrammableSubAddr(
+    maskBits = cfg.pcramKey.bankBits, 
+    longName = "PCRAM Bank Address", 
+    defaultOffset = 6, // Every read = bank-interleaving
+    defaultMask= 15    // PCRAM has 16 banks
+  ))
+  val pcramRankAddr = Input(new ProgrammableSubAddr(
+    maskBits = cfg.pcramKey.rankBits, 
+    longName = "PCRAM Rank Address", 
+    defaultOffset=pcramBankAddr.defaultOffset + log2Ceil(pcramBankAddr.defaultMask + 1), // defaultOffset=10, 
+    defaultMask = (1 << cfg.pcramKey.rankBits) -1   // defaultMask = 3
+  ))
+  val defaultRowOffset = pcramRankAddr.defaultOffset + log2Ceil(pcramRankAddr.defaultMask + 1)
+  val pcramRowAddr = Input(new ProgrammableSubAddr(
+    maskBits = cfg.pcramKey.rowBits, 
+    longName = "PCRAM Row Address", 
+    defaultOffset = defaultRowOffset, // defaultOffset=14,
+    defaultMask = (cfg.pcramKey.pcramSize >> defaultRowOffset.toInt) -1
+  ))
 
   // Additional latency added to read data beats after it's received from the devices
-  val backendLatency = Input(UInt(cfg.backendKey.latencyBits.W))
-  val frontendLatency = Input(UInt(cfg.backendKey.latencyBits.W))
+  val pcramTimings_backendLatency = Input(UInt(cfg.backendKey.latencyBits.W))
+  val pcramTimings_frontendLatency = Input(UInt(cfg.backendKey.latencyBits.W))
 
   val pcramTimings = Input(new PCRAMProgrammableTimings())
   val rankPower = Output(Vec(cfg.pcramKey.maxRanks, new PCRAMRankPowerIO))
@@ -135,12 +150,12 @@ abstract class BasePCRAMMMRegIO(cfg: PCRAMBaseConfig) extends MMRegIO(cfg) with 
 
   // END CHISEL TYPES
   val pcramBaseRegisters = Seq(
-    (backendLatency -> RuntimeSetting(1,
-                                      "Backend Latency",
+    (pcramTimings_backendLatency -> RuntimeSetting(1,
+                                      "PCRAM Backend Latency",
                                       min = 1,
                                       max = Some(1 << (cfg.backendKey.latencyBits - 1)))),
-    (frontendLatency -> RuntimeSetting(2,
-                                      "Frontend Latency",
+    (pcramTimings_frontendLatency -> RuntimeSetting(2,
+                                      "PCRAM Frontend Latency",
                                       min = 1,
                                       max = Some(1 << (cfg.backendKey.latencyBits - 1))))
   )
@@ -171,9 +186,9 @@ abstract class BasePCRAMMMRegIO(cfg: PCRAMBaseConfig) extends MMRegIO(cfg) with 
       def legendEntry = s"  ${shortName} -> ${longName}"
     }
 
-    //val ranks       = SubAddr("L", "Rank Address Bits", Some(rankAddr), numRanks)
-    val banks       = SubAddr("B", "Bank Address Bits", Some(bankAddr), numBanks)
-    val rows        = SubAddr("R", "Row Address Bits", Some(rowAddr),  numRows)
+    val ranks       = SubAddr("L", "Rank Address Bits", Some(pcramRankAddr), numRanks)
+    val banks       = SubAddr("B", "Bank Address Bits", Some(pcramBankAddr), numBanks)
+    val rows        = SubAddr("R", "Row Address Bits", Some(pcramRowAddr),  numRows)
     val linesPerRow = SubAddr("N", "log2(Lines Per Row)", None, pageSize/numBytesPerLine)
     val bytesPerLine= SubAddr("Z", "log2(Bytes Per Line)", None, numBytesPerLine)
 
@@ -298,9 +313,9 @@ class PCRAMModelEntry(key: PCRAMBaseConfig)(implicit p: Parameters) extends Nast
   val rankAddr = UInt(key.pcramKey.rankBits.W)
 
   def decode(from: NastiAddressChannel, mmReg: BasePCRAMMMRegIO) {
-    bankAddr := mmReg.bankAddr.getSubAddr(addr)
+    bankAddr := mmReg.pcramBankAddr.getSubAddr(addr)
     bankAddrOH := UIntToOH(bankAddr)
-    rankAddr := mmReg.rankAddr.getSubAddr(addr)
+    rankAddr := mmReg.pcramRankAddr.getSubAddr(addr)
     rankAddrOH := UIntToOH(rankAddr)
   }
   //val bankAddr = WireInit(UInt(key.pcramKey.bankBits.W), init=mmReg.bankAddr.getSubAddr(addr))

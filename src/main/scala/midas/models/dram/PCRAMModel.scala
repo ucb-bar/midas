@@ -18,8 +18,8 @@ case class PCRAMModelConfig(
 //    maxActBanks: Int,
 //    maxWriteBanks: Int,
     pcramKey: PCRAMOrganizationParams,
-    schedulerWindowSize: Int,
-    transactionQueueDepth: Int,
+    pcramSchedulerWindowSize: Int,
+    pcramTransactionQueueDepth: Int,
     backendKey: PCRAMBackendKey = PCRAMBackendKey(16, 16, PCRAMModelEnums.maxPCRAMTimingBits),
     baseParams: BaseParams)
   extends PCRAMBaseConfig(baseParams) {
@@ -28,20 +28,20 @@ case class PCRAMModelConfig(
 }
 
 class PCRAMModelMMRegIO(val cfg: PCRAMModelConfig) extends BasePCRAMMMRegIO(cfg) {
-  val schedulerWindowSize = Input(UInt(log2Ceil(cfg.schedulerWindowSize*2).W))
-  val transactionQueueDepth = Input(UInt(log2Ceil(cfg.transactionQueueDepth*2).W))
+  val pcramSchedulerWindowSize = Input(UInt(log2Ceil(cfg.pcramSchedulerWindowSize*2).W))
+  val pcramTransactionQueueDepth = Input(UInt(log2Ceil(cfg.pcramTransactionQueueDepth*2).W))
 
   val registers = pcramBaseRegisters ++ Seq(
-    (schedulerWindowSize -> RuntimeSetting(
-        default =  cfg.schedulerWindowSize,
+    (pcramSchedulerWindowSize -> RuntimeSetting(
+        default =  cfg.pcramSchedulerWindowSize,
         query   = "Reference queue depth",
         min     = 1,
-        max     = Some(cfg.schedulerWindowSize))),
-    transactionQueueDepth -> RuntimeSetting(
-        default = cfg.transactionQueueDepth,
+        max     = Some(cfg.pcramSchedulerWindowSize))),
+    pcramTransactionQueueDepth -> RuntimeSetting(
+        default = cfg.pcramTransactionQueueDepth,
         query   = "Transaction queue depth",
         min     = 1,
-        max     = Some(cfg.transactionQueueDepth)))
+        max     = Some(cfg.pcramTransactionQueueDepth)))
 
   def requestSettings() {
     Console.println(s"Configuring a PCRAM Bank-Conflict Model")
@@ -67,19 +67,19 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
 
   //** Define all queues **//
   // 1st-stage receiving queues for read and write
-  val xactionQueuesRead = Module(new Queue(new PCRAMModelEntry(cfg), cfg.transactionQueueDepth, pipe=true))
-  val xactionQueuesWrite = Module(new Queue(new PCRAMModelEntry(cfg), cfg.transactionQueueDepth, pipe=true))
+  val xactionQueuesRead = Module(new Queue(new PCRAMModelEntry(cfg), cfg.pcramTransactionQueueDepth, pipe=true))
+  val xactionQueuesWrite = Module(new Queue(new PCRAMModelEntry(cfg), cfg.pcramTransactionQueueDepth, pipe=true))
   // 2nd-stage buffer for scheduling with RankStateTrackers
   val newReferenceRead = Wire(Decoupled(new PCRAMModelEntry(cfg)))
   val newReferenceWrite = Wire(Decoupled(new PCRAMModelEntry(cfg)))
   val refBufferRead = CollapsingBuffer(
     enq               = newReferenceRead,
-    depth             = cfg.schedulerWindowSize,
-    programmableDepth = Some(io.mmReg.schedulerWindowSize))
+    depth             = cfg.pcramSchedulerWindowSize,
+    programmableDepth = Some(io.mmReg.pcramSchedulerWindowSize))
   val refBufferWrite = CollapsingBuffer(
     enq               = newReferenceWrite,
-    depth             = cfg.schedulerWindowSize,
-    programmableDepth = Some(io.mmReg.schedulerWindowSize))
+    depth             = cfg.pcramSchedulerWindowSize,
+    programmableDepth = Some(io.mmReg.pcramSchedulerWindowSize))
   val refReadUpdates = refBufferRead.io.updates       // updates = Input
   val refReadList = refBufferRead.io.entries          // entries = Output
   val refWriteUpdates = refBufferWrite.io.updates       // updates = Input
@@ -219,12 +219,12 @@ class PCRAMModel(cfg: PCRAMModelConfig)(implicit p: Parameters) extends TimingMo
     when (sel.fire()) { ref.valid := false.B } }
 
   backend.io.tCycle := tCycle
-  backend.io.readLatency := timings.tREAD + io.mmReg.backendLatency
+  backend.io.readLatency := timings.tREAD + io.mmReg.pcramTimings_backendLatency
   backend.io.newRead.valid := (numActBanks <= cfg.pcramKey.maxActBanks.U) && commandArbiterRead.io.out.valid 
   backend.io.newRead.bits := ReadResponseMetaData(commandArbiterRead.io.out.bits.xaction) 
   commandArbiterRead.io.out.ready := (numActBanks < cfg.pcramKey.maxActBanks.U) && backend.io.newRead.ready
 
-  backend.io.writeLatency := timings.tWRITE + io.mmReg.backendLatency
+  backend.io.writeLatency := timings.tWRITE + io.mmReg.pcramTimings_backendLatency
   backend.io.newWrite.valid := (numActBanks < cfg.pcramKey.maxWriteBanks.U) && commandArbiterWrite.io.out.valid 
   backend.io.newWrite.bits := WriteResponseMetaData(commandArbiterWrite.io.out.bits.xaction)
   commandArbiterWrite.io.out.ready := (numActBanks < cfg.pcramKey.maxWriteBanks.U) && backend.io.newWrite.ready
