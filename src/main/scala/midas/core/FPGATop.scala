@@ -140,8 +140,8 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
   defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft Bool(true)){ (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady){ (ready, i) =>
       val widgetName = (endpoint, p(MemModelKey)) match {
-        case (_: SimMemIO, Some(_)) => s"MemModel_$i"
-        case (_: SimMemIO, None) => s"NastiWidget_$i"
+        case (_: SimMemIO, Nil) => s"NastiWidget_$i"
+        case (_: SimMemIO, _)   => s"MemModel_$i"
         case _ => s"${endpoint.widgetName}_$i"
       }
       val widget = addWidget(endpoint.widget(p), widgetName)

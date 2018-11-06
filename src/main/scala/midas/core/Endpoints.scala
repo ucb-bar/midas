@@ -34,12 +34,16 @@ abstract class SimMemIO extends Endpoint {
   // This is hideous, but we want some means to get the widths of the target
   // interconnect so that we can pass that information to the widget the
   // endpoint will instantiate.
-  var targetAXI4Widths = NastiParameters(0,0,0)
-  var initialized = false
+  var targetAXI4Widths = collection.mutable.ArrayBuffer[NastiParameters]()
+  private var initialized = false
+  // Each channel may have a different memory model configuration. Index into the Field
+  // based on how many models we've instantiated
+  private var widgetIdx = 0
+
   override def add(name: String, channel: Data) {
     initialized = true
     super.add(name, channel)
-    targetAXI4Widths = channel match {
+    targetAXI4Widths += (channel match {
       case axi4: AXI4Bundle => NastiParameters(axi4.r.bits.data.getWidth,
                                                axi4.ar.bits.addr.getWidth,
                                                axi4.ar.bits.id.getWidth)
@@ -47,20 +51,23 @@ abstract class SimMemIO extends Endpoint {
                                             axi4.ar.bits.addr.getWidth,
                                             axi4.ar.bits.id.getWidth)
       case _ => throw new RuntimeException("Unexpected channel type passed to SimMemIO")
-    }
+    })
   }
 
-  private def getChannelAXI4Parameters = {
+  private def getChannelAXI4Parameters(idx: Int): NastiParameters = {
     scala.Predef.assert(initialized, "Widget instantiated without first binding a target channel.")
-    targetAXI4Widths
+    targetAXI4Widths(idx)
   }
 
   def widget(p: Parameters) = {
-    val param = p alterPartial ({ case NastiKey => getChannelAXI4Parameters })
-    (p(MemModelKey): @unchecked) match {
-      case Some(modelGen) => modelGen(param)
-      case None => new NastiWidget()(param)
+    val axi4widths = getChannelAXI4Parameters(widgetIdx)
+    val param = p alterPartial ({ case NastiKey => axi4widths })
+    val gen = p(MemModelKey) match {
+      case Nil => new NastiWidget()(param)
+      case modelGen => modelGen(widgetIdx)(param)
     }
+    widgetIdx += 1
+    gen
   }
 }
 
