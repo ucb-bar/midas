@@ -24,7 +24,7 @@ case object ExcludeInstanceAsserts extends Field[Seq[(String, String)]](Seq())
 case object EnableSnapshot extends Field[Boolean]
 case object HasDMAChannel extends Field[Boolean]
 case object KeepSamplesInMem extends Field[Boolean]
-case object MemModelKey extends Field[Option[Parameters => MemModel]]
+case object MemModelKey extends Field[Seq[Parameters => MemModel]]
 case object EndpointKey extends Field[EndpointMap]
 
 class SimConfig extends Config((site, here, up) => {
@@ -41,7 +41,7 @@ class SimConfig extends Config((site, here, up) => {
   case DMANastiKey      => NastiParameters(512, 64, 6)
   case EndpointKey      => EndpointMap(Seq(
     new SimNastiMemIO, new SimAXI4MemIO, new AssertBundleEndpoint, new PrintRecordEndpoint))
-  case MemModelKey      => Some((p: Parameters) => new SimpleLatencyPipe()(p))
+  case MemModelKey      => Seq((p: Parameters) => new SimpleLatencyPipe()(p))
   case FpgaMMIOSize     => BigInt(1) << 12 // 4 KB
   case MidasLLCKey      => None
   case AXIDebugPrint    => false
