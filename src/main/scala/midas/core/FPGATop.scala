@@ -188,7 +188,7 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
   val mem_xbar = Module(new NastiRecursiveInterconnect(numMemModels + 1, hostMemAddrMap)(nastiP))
 
   io.mem.zip(mem_xbar.io.slaves).foreach({ case (mem, slave) => mem <> NastiQueue(slave)(nastiP) })
-  memPorts.zip(mem_xbar.io.masters).foreach({ case (mem_model, master) => master <> mem_model })
+  memPorts.zip(mem_xbar.io.masters).foreach({ case (mem_model, master) => master <> NastiQueue(mem_model)(nastiP) })
 
 
   // Sort the list of DMA ports by address region size, largest to smallest
