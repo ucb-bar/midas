@@ -67,6 +67,7 @@ abstract class SimMemIO extends Endpoint {
     val param = p alterPartial ({ case NastiKey => axi4widths })
     val gen = p(MemModelKey) match {
       case Nil => new NastiWidget()(param)
+      case Seq(singleGen) => singleGen(param)
       case modelGen => modelGen(widgetIdx)(param)
     }
     widgetIdx += 1
