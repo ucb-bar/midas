@@ -65,7 +65,11 @@ case class BaseParams(
         { x => true.B })
   ),
 
-  addrRangeCounters: BigInt = BigInt(0)
+  addrRangeCounters: BigInt = BigInt(0),
+
+  // Hacks for CS152
+  hardWiredSettings: Option[DramHardwiredSettings] = None,
+  hardWiredLLCSettings: Option[LLCHardwiredSettings] = None
 )
 
 abstract class BaseConfig(val params: BaseParams)(implicit p: Parameters) {
@@ -456,10 +460,16 @@ class FASEDMemoryTimingModel(cfg: BaseConfig)(implicit p: Parameters) extends En
     io.host_mem.b.bits.resp =/= 0.U && io.host_mem.b.fire)
 
   // Generate the configuration registers and tie them to the ctrl bus
-  attachIO(model.io.mmReg)
+  cfg.params.hardWiredSettings match {
+    case Some(settings) => model.io.mmReg.hardWireSettings(settings)
+    case None => attachIO(model.io.mmReg)
+  }
+  cfg.params.hardWiredLLCSettings.foreach({settings => model.io.mmReg.llc.get.hardWireSettings(settings) })
+
   attachIO(funcModelRegs)
   attach(rrespError, "rrespError", ReadOnly)
   attach(brespError, "brespError", ReadOnly)
+
 
   genCRFile()
   dontTouch(targetFire)

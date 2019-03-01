@@ -63,6 +63,8 @@ class BlockMetadata(tagBits: Int) extends Bundle {
   override def cloneType = new BlockMetadata(tagBits).asInstanceOf[this.type]
 }
 
+case class LLCHardwiredSettings(wayBits: Int, setBits: Int, blockBits: Int)
+
 class LLCProgrammableSettings(llcKey: LLCParams) extends Bundle
     with HasProgrammableRegisters with HasConsoleUtils {
   val wayBits    = Input(UInt(log2Ceil(llcKey.ways.maxBits).W))
@@ -101,6 +103,11 @@ class LLCProgrammableSettings(llcKey: LLCParams) extends Bundle
                                               max = Some(llcKey.ways.max))))
   }
 
+  def hardWireSettings(hwSettings: LLCHardwiredSettings): Unit = {
+    wayBits := hwSettings.wayBits.U
+    setBits := hwSettings.setBits.U
+    blockBits := hwSettings.blockBits.U
+  }
 }
 
 case class WRange(min: Int, max: Int) {
