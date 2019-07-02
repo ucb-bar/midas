@@ -16,7 +16,6 @@ import java.io.{File, FileWriter, StringWriter}
 private[passes] class PreLinkRenaming(childNamespace: Namespace) extends firrtl.Transform {
 
   override def name = "[MIDAS] Pre-link Module Renaming"
-  // TODO: Technically this xform should be able to accept AnyForm(TM); and be form idempotent
   def inputForm = LowForm
   def outputForm = LowForm
 

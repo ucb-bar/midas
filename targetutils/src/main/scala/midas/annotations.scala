@@ -103,3 +103,8 @@ object ExcludeInstanceAsserts {
       def toFirrtl = ExcludeInstanceAssertsAnnotation(target)
     }
 }
+
+private[midas] case class EndpointAnnotation(val target: ModuleTarget) extends SingleTargetAnnotation[ModuleTarget] {
+  def duplicate(n: ModuleTarget) = this.copy(target)
+}
+

@@ -3,14 +3,16 @@
 package midas
 package widgets
 
+import midas.targetutils.EndpointAnnotation
 import midas.core.{IsRationalClockRatio, UnityClockRatio, HostPort, HostPortIO, SimUtils}
 
 import freechips.rocketchip.config.Parameters
 
 import chisel3._
 import chisel3.util._
-import chisel3.core.ActualDirection
-import chisel3.core.DataMirror.directionOf
+import chisel3.experimental.{annotate, ChiselAnnotation}
+
+
 
 import scala.collection.mutable.{ArrayBuffer, HashSet}
 
@@ -62,3 +64,10 @@ case class EndpointMap(endpoints: Seq[Endpoint]) {
   def get(data: Data) = endpoints find (_ matchType data)
   def ++(x: EndpointMap) = EndpointMap(endpoints ++ x.endpoints) 
 }
+
+
+trait IsEndpoint {
+  self: BlackBox =>
+  annotate(new ChiselAnnotation { def toFirrtl = EndpointAnnotation(self.toNamed.toTarget) })
+}
+

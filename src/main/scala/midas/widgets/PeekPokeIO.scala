@@ -131,3 +131,7 @@ class PeekPokeIOWidget(inputs: Seq[(String, Int)], outputs: Seq[(String, Int)])
     sb.append(genArray("OUTPUT_CHUNKS", outputs.unzip._2 map (UInt32(_))))
   }
 }
+
+class PeekPokeEndpoint[T <: Record](gen: T) extends BlackBox with IsEndpoint {
+  val io = IO(gen)
+}

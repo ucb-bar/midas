@@ -34,6 +34,7 @@ private[midas] class MidasTransforms(
       new firrtl.transforms.DeadCodeElimination,
       firrtl.passes.ResolveKinds,
       firrtl.passes.RemoveEmpty,
+      new EndpointExtraction,
       // NB: Carelessly removing this pass will break the FireSim manager as we always
       // need to generate the *.asserts file. Fix by baking into driver.
       new AssertPass(dir),
