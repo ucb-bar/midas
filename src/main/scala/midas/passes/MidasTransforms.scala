@@ -12,6 +12,7 @@ import firrtl.Mappers._
 import firrtl.transforms.{DedupModules, DeadCodeElimination}
 import Utils._
 import java.io.{File, FileWriter}
+import logger.{Logger, LogLevel}
 
 private[passes] class WCircuit(
   info: Info,
@@ -45,6 +46,7 @@ private[midas] class MidasTransforms(
       new SimulationMapping(io),
       new PlatformMapping(state.circuit.main, dir)
     )
+    Logger.setLevel(LogLevel.Trace)
     (xforms foldLeft state)((in, xform) => xform runTransform in).copy(form=outputForm)
   }
 }
