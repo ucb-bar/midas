@@ -64,6 +64,37 @@ private[passes] class EndpointExtraction extends firrtl.Transform {
     state.copy(annotations = state.annotations ++ instAnnos)
   }
 
+  def getEndpointConnectivity(portInstMapping: mutable.ArrayBuffer[(String, String)],
+                              insts: mutable.ArrayBuffer[(String, String)])
+                             (stmt: Statement): Statement = stmt.map(getEndpointConnectivity(portInstMapping, insts)) match {
+                               // Need to collect WDefInsts too
+    case c @ Connect(_, WSubField(WRef(topName, _, InstanceKind, _), portName, _, _), 
+                        WRef(endpointInstName, _, InstanceKind, _)) => {
+      portInstMapping += (portName -> endpointInstName)
+      c
+    }
+    case i @ WDefInstance(_, name, module, _) if name != "realTopInst" => insts += (name -> module); i
+    case s => s
+  }
+
+  // Moves endpoint annotations from BlackBox onto newly created ports
+  def commuteEndpointAnnotations(state: CircuitState): CircuitState = {
+    val c = state.circuit
+    val topModule = c.modules.find(_.name == c.main).get
+    // Collect all endpoint modules
+    val endpointAnnos = state.annotations.collect({ case anno: EndpointAnnotation => anno })
+    val endpointAnnoMap = endpointAnnos.map(anno => anno.target.module -> anno ).toMap
+
+    val portInstPairs = new mutable.ArrayBuffer[(String, String)]()
+    val instList      = new mutable.ArrayBuffer[(String, String)]()
+    topModule.map(getEndpointConnectivity(portInstPairs, instList))
+    val instMap = instList.toMap
+
+    val ioEndpointAnnotations = portInstPairs.map({ case (port, inst) =>
+      endpointAnnoMap(instMap(inst)).toIOAnnotation(port)
+    })
+    state.copy(annotations = state.annotations ++ ioEndpointAnnotations)
+  }
 
   def execute(state: CircuitState): CircuitState = {
     val c = state.circuit
@@ -82,15 +113,15 @@ private[passes] class EndpointExtraction extends firrtl.Transform {
     val promotedState = promoteEndpoints(instAnnoedState)
 
     // Propogate endpoint annotations to the IO created on the true top module
-
+    val commutedState = commuteEndpointAnnotations(promotedState)
 
     // Remove all endpoint modules and the dummy top wrapper
     val modulesToRemove = endpointMods += topWrapperName
-    val prunedCircuit = promotedState.circuit.copy(
+    val prunedCircuit = commutedState.circuit.copy(
       modules = promotedState.circuit.modules.filterNot(m => modulesToRemove(m.name)),
       main = c.main
     )
-    assert(1 == 0)
+
     promotedState.copy(circuit = prunedCircuit)
   }
 }
