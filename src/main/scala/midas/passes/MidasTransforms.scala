@@ -46,7 +46,7 @@ private[midas] class MidasTransforms(
       new SimulationMapping(io),
       new PlatformMapping(state.circuit.main, dir)
     )
-    Logger.setLevel(LogLevel.Trace)
+    //Logger.setLevel(LogLevel.Trace)
     (xforms foldLeft state)((in, xform) => xform runTransform in).copy(form=outputForm)
   }
 }

@@ -103,12 +103,3 @@ object ExcludeInstanceAsserts {
       def toFirrtl = ExcludeInstanceAssertsAnnotation(target)
     }
 }
-
-private[midas] case class EndpointAnnotation(val target: ModuleTarget) extends SingleTargetAnnotation[ModuleTarget] {
-  def duplicate(n: ModuleTarget) = this.copy(target)
-  def toIOAnnotation(port: String) = EndpointIOAnnotation(target.copy(module = target.circuit).ref(port))
-}
-
-private[midas] case class EndpointIOAnnotation(val target: ReferenceTarget) extends SingleTargetAnnotation[ReferenceTarget] {
-  def duplicate(n: ReferenceTarget) = this.copy(target)
-}
