@@ -162,7 +162,7 @@ class MemModelIO(implicit val p: Parameters) extends WidgetIO()(p){
   val host_mem = new NastiIO()(p.alterPartial({ case NastiKey => p(MemNastiKey)}))
 }
 
-class FASEDMemoryTimingModel(cfg: BaseConfig)(implicit p: Parameters) extends EndpointWidget()(p) {
+class FASEDMemoryTimingModel(cfg: BaseConfig)(implicit p: Parameters) extends TypedEndpointWidget[BaseConfig, HostPortIO[FASEDTargetIO]]()(p) {
   require(p(NastiKey).idBits <= p(MemNastiKey).idBits,
     "Target AXI4 IDs cannot be mapped 1:1 onto host AXI4 IDs"
   )
@@ -529,10 +529,10 @@ class FASEDMemoryTimingModel(cfg: BaseConfig)(implicit p: Parameters) extends En
   }
 }
 
-class FASEDEndpoint(cfg: BaseConfig)(implicit p: Parameters) extends BlackBox with IsEndpoint {
+class FASEDEndpoint(val constructorArg: BaseConfig)(implicit p: Parameters)
+    extends BlackBox with TypedEndpoint[BaseConfig, HostPortIO[FASEDTargetIO], FASEDMemoryTimingModel] {
   val io = IO(new FASEDTargetIO)
   val endpointIO = HostPort(io)
-  def widget = (hostP: Parameters) => new FASEDMemoryTimingModel(cfg)(p ++ hostP)
   generateAnnotations()
 }
 

@@ -2,7 +2,7 @@
 
 package midas.passes
 
-import midas.widgets.EndpointAnnotation
+import midas.widgets.{IsEndpointAnnotation, EndpointAnnotation}
 import midas.passes.fame.{PromoteSubmodule, PromoteSubmoduleAnnotation, FAMEChannelConnectionAnnotation}
 
 import firrtl._
@@ -50,7 +50,7 @@ private[passes] class EndpointExtraction extends firrtl.Transform {
     val c = state.circuit
     val iGraph  =  new firrtl.analyses.InstanceGraph(c)
     // Collect all endpoint modules
-    val endpointAnnos = state.annotations.collect({ case EndpointAnnotation(mT, _, _) => mT })
+    val endpointAnnos = state.annotations.collect({ case anno: IsEndpointAnnotation => anno.target })
     val endpointModules = endpointAnnos.map(_.module)
 
     // Get a list of all endpoint instances using iGraph
@@ -82,11 +82,11 @@ private[passes] class EndpointExtraction extends firrtl.Transform {
     val c = state.circuit
     val topModule = c.modules.find(_.name == c.main).get
     // Collect all endpoint modules
-    val endpointAnnos = mutable.ArrayBuffer[EndpointAnnotation]()
+    val endpointAnnos = mutable.ArrayBuffer[IsEndpointAnnotation]()
     val fcaAnnos = mutable.ArrayBuffer[FAMEChannelConnectionAnnotation]()
 
     val otherAnnos = state.annotations.flatMap({
-      case anno: EndpointAnnotation => endpointAnnos += anno; None
+      case anno: IsEndpointAnnotation => endpointAnnos += anno; None
       case fca: FAMEChannelConnectionAnnotation => fcaAnnos += fca; None
       case otherAnno => Some(otherAnno)
     })
