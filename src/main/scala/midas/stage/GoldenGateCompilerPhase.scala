@@ -2,7 +2,6 @@
 
 package midas.stage
 
-
 import midas._
 
 import firrtl.ir.Circuit
@@ -31,7 +30,7 @@ class GoldenGateCompilerPhase extends Phase {
       InferReadWriteAnnotation
     )
     val targetDir = annotations.collectFirst({
-      case TargetDirAnnotation(targetDir) => targetDir
+      case TargetDirAnnotation(targetDir) => new File(targetDir)
     }).get
 
     implicit val p = (new F1Config).alterPartial({ case OutputDir => targetDir })

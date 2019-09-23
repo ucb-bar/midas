@@ -67,11 +67,11 @@ case class EndpointAnnotation(
    }
 }
 
-case class SerializableEndpointAnnotation(
+case class SerializableEndpointAnnotation[T <: AnyRef](
     val target: ModuleTarget,
     channelNames: Seq[String],
     widgetClass: String,
-    widgetConstructorKey: AnyRef) extends IsEndpointAnnotation {
+    widgetConstructorKey: T) extends IsEndpointAnnotation {
   def duplicate(n: ModuleTarget) = this.copy(target)
   def toIOAnnotation(port: String): EndpointIOAnnotation = {
     val channelMapping = channelNames.map(oldName => oldName -> s"${port}_$oldName")
@@ -87,7 +87,7 @@ private[midas] case class EndpointIOAnnotation(
     channelMapping: Map[String, String],
     widget: Option[(Parameters) => EndpointWidget] = None,
     widgetClass: Option[String] = None,
-    widgetConstructorKey: Option[Object] = None) extends SingleTargetAnnotation[ReferenceTarget] {
+    widgetConstructorKey: Option[AnyRef] = None) extends SingleTargetAnnotation[ReferenceTarget] {
   def duplicate(n: ReferenceTarget) = this.copy(target)
   def channelNames = channelMapping.map(_._2)
   def elaborateWidget(implicit p: Parameters): EndpointWidget = widget match {

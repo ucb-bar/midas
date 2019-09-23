@@ -6,14 +6,10 @@ import firrtl.options.Shell
 
 trait GoldenGateCli { this: Shell =>
   parser.note("Golden Gate Compiler Options")
-  Seq( firrtl.stage.FirrtlFileAnnotation,
-       firrtl.stage.OutputFileAnnotation,
-       firrtl.stage.InfoModeAnnotation,
-       firrtl.stage.FirrtlSourceAnnotation,
-       firrtl.EmitCircuitAnnotation,
-       firrtl.EmitAllModulesAnnotation )
+  Seq(GoldenGateInputAnnotationFileAnnotation,
+      firrtl.stage.FirrtlFileAnnotation,
+      firrtl.stage.OutputFileAnnotation,
+      firrtl.stage.FirrtlSourceAnnotation,
+      firrtl.EmitCircuitAnnotation)
     .map(_.addOptions(parser))
-
-  //phases.DriverCompatibility.TopNameAnnotation.addOptions(parser)
-  //phases.DriverCompatibility.EmitOneFilePerModuleAnnotation.addOptions(parser)
 }
