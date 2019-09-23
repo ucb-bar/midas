@@ -43,9 +43,9 @@ case class FAMEChannelPortsAnnotation(
   * @param channelInfo  describes the type of the channel (Wire, Forward/Reverse
   *  Decoupled)
   */
-case class FAMEChannelConnectionAnnotation[T <: FAMEChannelInfo](
+case class FAMEChannelConnectionAnnotation(
   globalName: String,
-  channelInfo: T,
+  channelInfo: FAMEChannelInfo,
   sources: Option[Seq[ReferenceTarget]],
   sinks: Option[Seq[ReferenceTarget]]) extends Annotation {
   def update(renames: RenameMap): Seq[Annotation] = {
@@ -55,7 +55,7 @@ case class FAMEChannelConnectionAnnotation[T <: FAMEChannelInfo](
 
   def getEndpointModule(): String = sources.getOrElse(sinks.get).head.module
 
-  def moveFromEndpoint(portName: String): FAMEChannelConnectionAnnotation[T] = {
+  def moveFromEndpoint(portName: String): FAMEChannelConnectionAnnotation = {
     def updateRT(rT: ReferenceTarget): ReferenceTarget = ModuleTarget(rT.circuit, rT.circuit).ref(portName).field(rT.ref)
 
     require(sources == None || sinks == None, "Endpoint-connected channels cannot loopback")
@@ -73,16 +73,16 @@ case class FAMEChannelConnectionAnnotation[T <: FAMEChannelInfo](
 
 // Helper factory methods for generating endpoint annotations that have only sinks or sources
 object FAMEChannelConnectionAnnotation {
-  def sink[T <: FAMEChannelInfo](
+  def sink(
     globalName: String,
-    channelInfo: T,
-    sinks: Seq[ReferenceTarget]): FAMEChannelConnectionAnnotation[T] =
+    channelInfo: FAMEChannelInfo,
+    sinks: Seq[ReferenceTarget]): FAMEChannelConnectionAnnotation =
   FAMEChannelConnectionAnnotation(globalName, channelInfo, None, Some(sinks))
 
-  def source[T <: FAMEChannelInfo](
+  def source(
     globalName: String,
-    channelInfo: T,
-    sources: Seq[ReferenceTarget]): FAMEChannelConnectionAnnotation[T] =
+    channelInfo: FAMEChannelInfo,
+    sources: Seq[ReferenceTarget]): FAMEChannelConnectionAnnotation =
   FAMEChannelConnectionAnnotation(globalName, channelInfo, Some(sources), None)
 }
 

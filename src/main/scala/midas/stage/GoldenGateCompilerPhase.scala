@@ -41,7 +41,7 @@ class GoldenGateCompilerPhase extends Phase {
       targetTransforms :+ midasTransforms)
 
     val postHostTransforms = new HostTransformCompiler().compile(midas, hostTransforms)
-    val result = new LastStageVerilogCompiler().compile(postHostTransforms, Seq())
-    FirrtlCircuitAnnotation(result.circuit) +: result.annotations
+    val result = new LastStageVerilogCompiler().compileAndEmit(postHostTransforms, Seq())
+    result.annotations
   }
 }
