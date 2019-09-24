@@ -25,7 +25,6 @@ object JsonProtocol {
       new GenericTargetSerializer + new CircuitTargetSerializer + new ModuleTargetSerializer +
       new InstanceTargetSerializer + new ReferenceTargetSerializer + new TransformSerializer  +
       new LoadMemoryFileTypeSerializer
-      //+ new FAMEChannelInfoSerializer
   }
 
   /** Serialize annotations to a String for emission */

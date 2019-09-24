@@ -6,7 +6,7 @@ package widgets
 import midas.core.{SimWrapperChannels, SimUtils}
 import midas.core.SimUtils.{RVChTuple}
 
-import midas.passes.fame.{FAMEChannelConnectionAnnotation,DecoupledForwardChannel, PipeChannel, DecoupledReverseChannel, WireChannel}
+import midas.passes.fame.{FAMEChannelConnectionAnnotation,DecoupledForwardChannel, PipeChannel, DecoupledReverseChannel, WireChannel, JsonProtocol}
 
 import freechips.rocketchip.config.Parameters
 
@@ -79,7 +79,18 @@ case class SerializableEndpointAnnotation[T <: AnyRef](
       channelMapping.toMap,
       widgetClass = Some(widgetClass),
       widgetConstructorKey = Some(widgetConstructorKey))
-   }
+  }
+
+  // This is brain dead, but check we can actually serialize our annotation by trying it in memory
+  def checkSerializability(): Unit = {
+    try {
+      val ser   = JsonProtocol.serialize(Seq(this))
+      val deser = JsonProtocol.deserializeTry(ser).get
+    } catch {
+      case t: org.json4s.MappingException => throw new Exception(
+        s"Could not serialize EndpointAnnotation with constructor key of type ${widgetConstructorKey.getClass}\n")
+    }
+  }
 }
 
 private[midas] case class EndpointIOAnnotation(
@@ -142,12 +153,15 @@ trait TypedEndpoint[CArg <: Object,
     val widgetClassSymbol = baseType.typeArgs(2).typeSymbol.asClass
 
     // Generate the endpoint annotation
-    annotate(new ChiselAnnotation { def toFirrtl =
-      SerializableEndpointAnnotation(self.toNamed.toTarget,
-                         endpointIO.allChannelNames,
-                         widgetClass = widgetClassSymbol.fullName,
-                         widgetConstructorKey = constructorArg
-                       )
+    annotate(new ChiselAnnotation { def toFirrtl = {
+        val anno = SerializableEndpointAnnotation(
+          self.toNamed.toTarget,
+          endpointIO.allChannelNames,
+          widgetClass = widgetClassSymbol.fullName,
+          widgetConstructorKey = constructorArg)
+        anno.checkSerializability
+        anno
+      }
     })
     // Emit annotations to capture channel information
     endpointIO.generateAnnotations()
