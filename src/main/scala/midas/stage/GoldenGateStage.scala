@@ -29,17 +29,3 @@ class GoldenGateStage extends Stage with PreservesAll[Phase] {
 }
 
 object GoldenGateMain extends StageMain(new GoldenGateStage)
-//class GoldenGateMain {
-//
-//  /** The main function that serves as this stage's command line interface.
-//    * @param args command line arguments
-//    */
-//  final def main(args: Array[String]): Unit = try {
-//    stage.execute(args, Seq.empty)
-//  } catch {
-//    case a: OptionsException =>
-//      StageUtils.dramaticUsageError(a.message)
-//      System.exit(1)
-//  }
-//
-//}
