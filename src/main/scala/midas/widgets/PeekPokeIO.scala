@@ -26,7 +26,7 @@ class PeekPokeWidgetIO(implicit val p: Parameters) extends WidgetIO()(p) {
 case class PeekPokeKey(
   peeks: Seq[SerializableField],
   pokes: Seq[SerializableField],
-  maxChannelDecoupling: Int = 2)
+  maxChannelDecoupling: Int = 2) extends WidgetConstructorArgument
 
 object PeekPokeKey {
   def apply(targetIO: Record): PeekPokeKey = {

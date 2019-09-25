@@ -28,7 +28,7 @@ import scala.collection.immutable.ListMap
  * from the transformed-RTL model.
  *
  * Endpoints extend Widget to add an IO that includes a HostPort[T <: Data] which
- * contains bidriectional channels for token-flow moving from the transformed-RTL
+ * contains bidirectional channels for token-flow moving from the transformed-RTL
  * model to the endpoint ("toHost"), and from the endpoint to the transformed
  * RTL model ("fromHost")
  *
@@ -67,7 +67,14 @@ case class EndpointAnnotation(
    }
 }
 
-case class SerializableEndpointAnnotation[T <: AnyRef](
+trait WidgetConstructorArgument {
+  // For serialization of complicated constuctor arguments, let the endpoint
+  // designer specify additional type hints for relevant classes that might be
+  // contained within
+  def additionalTypeHints(): Seq[Class[_]] = Seq.empty
+}
+
+case class SerializableEndpointAnnotation[T <: WidgetConstructorArgument](
     val target: ModuleTarget,
     channelNames: Seq[String],
     widgetClass: String,
@@ -88,7 +95,7 @@ case class SerializableEndpointAnnotation[T <: AnyRef](
       val deser = JsonProtocol.deserializeTry(ser).get
     } catch {
       case t: org.json4s.MappingException => throw new Exception(
-        s"Could not serialize EndpointAnnotation with constructor key of type ${widgetConstructorKey.getClass}\n")
+        s"Could not serialize EndpointAnnotation with constructor key of type ${widgetConstructorKey.getClass}\n${t.getMessage}")
     }
   }
 }
@@ -105,7 +112,6 @@ private[midas] case class EndpointIOAnnotation(
     case Some(elaborator) => elaborator(p)
     case None =>
       val constructor = Class.forName(widgetClass.get).getConstructors()(0)
-      println(constructor)
       constructor.newInstance(widgetConstructorKey.get, p).asInstanceOf[EndpointWidget]
   }
 }
@@ -134,7 +140,7 @@ trait IsEndpoint {
   }
 }
 
-trait TypedEndpoint[CArg <: Object,
+trait TypedEndpoint[CArg <: WidgetConstructorArgument,
                     HPType <: TokenizedRecord,
                     WidgetType <: TypedEndpointWidget[CArg, HPType]] {
   self: BaseModule =>
@@ -159,7 +165,7 @@ trait TypedEndpoint[CArg <: Object,
           endpointIO.allChannelNames,
           widgetClass = widgetClassSymbol.fullName,
           widgetConstructorKey = constructorArg)
-        anno.checkSerializability
+        //anno.checkSerializability
         anno
       }
     })

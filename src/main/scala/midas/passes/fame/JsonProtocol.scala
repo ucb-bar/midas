@@ -16,7 +16,8 @@ import org.json4s.native.Serialization.{read, writePretty}
 object JsonProtocol {
   import firrtl.annotations.JsonProtocol._
 
-  val fameChannelInfoClasses = Seq(classOf[PipeChannel], classOf[DecoupledForwardChannel])
+  val fameChannelInfoClasses = Seq(classOf[PipeChannel], classOf[DecoupledForwardChannel], DecoupledReverseChannel.getClass,
+    classOf[midas.models.BaseConfig], classOf[midas.models.CompleteConfig[_]])
   /** Construct Json formatter for annotations */
   def jsonFormat(tags: Seq[Class[_]]) = {
     Serialization.formats(FullTypeHints(tags.toList)).withTypeHintFieldName("class") +
@@ -33,8 +34,8 @@ object JsonProtocol {
   def serializeTry(annos: Seq[Annotation]): Try[String] = {
     val tags = annos.map(_.getClass).distinct
     val endpointTags = annos.collect({
-      case SerializableEndpointAnnotation(_, _, _, epKey) => epKey.getClass
-    }).distinct ++ fameChannelInfoClasses
+      case SerializableEndpointAnnotation(_, _, _, epKey) => epKey.getClass +: epKey.additionalTypeHints
+    }).flatten.distinct ++ fameChannelInfoClasses
 
     implicit val formats = jsonFormat(tags ++ endpointTags)
     Try(writePretty(annos))
