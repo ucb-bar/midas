@@ -6,7 +6,7 @@ package widgets
 import midas.core.{SimWrapperChannels, SimUtils}
 import midas.core.SimUtils.{RVChTuple}
 
-import midas.passes.fame.{FAMEChannelConnectionAnnotation,DecoupledForwardChannel, PipeChannel, DecoupledReverseChannel, WireChannel, JsonProtocol}
+import midas.passes.fame.{FAMEChannelConnectionAnnotation,DecoupledForwardChannel, PipeChannel, DecoupledReverseChannel, WireChannel, JsonProtocol, HasSerializationHints}
 
 import freechips.rocketchip.config.Parameters
 
@@ -44,8 +44,7 @@ abstract class EndpointWidget(implicit p: Parameters) extends Widget()(p) {
   def hPort: TokenizedRecord // Tokenized port moving between the endpoint the target-RTL
 }
 
-abstract class TypedEndpointWidget[ConstructorArg <: Object,
-                                   HostPortType <: TokenizedRecord]
+abstract class TypedEndpointWidget[HostPortType <: TokenizedRecord]
   (implicit p: Parameters) extends EndpointWidget()(p) {
   override def hPort: HostPortType
 }
@@ -67,25 +66,25 @@ case class EndpointAnnotation(
    }
 }
 
-trait WidgetConstructorArgument {
-  // For serialization of complicated constuctor arguments, let the endpoint
-  // designer specify additional type hints for relevant classes that might be
-  // contained within
-  def additionalTypeHints(): Seq[Class[_]] = Seq.empty
-}
-
-case class SerializableEndpointAnnotation[T <: WidgetConstructorArgument](
+case class SerializableEndpointAnnotation[T <: AnyRef](
     val target: ModuleTarget,
     channelNames: Seq[String],
     widgetClass: String,
-    widgetConstructorKey: T) extends IsEndpointAnnotation {
+    widgetConstructorKey: Option[T])
+  extends IsEndpointAnnotation with HasSerializationHints {
+
+  def typeHints() = widgetConstructorKey match {
+    case Some(key: HasSerializationHints) => key.getClass +: key.typeHints
+    case Some(key) => Seq(key.getClass)
+    case None => Seq()
+  }
   def duplicate(n: ModuleTarget) = this.copy(target)
   def toIOAnnotation(port: String): EndpointIOAnnotation = {
     val channelMapping = channelNames.map(oldName => oldName -> s"${port}_$oldName")
     EndpointIOAnnotation(target.copy(module = target.circuit).ref(port),
       channelMapping.toMap,
       widgetClass = Some(widgetClass),
-      widgetConstructorKey = Some(widgetConstructorKey))
+      widgetConstructorKey = widgetConstructorKey)
   }
 
   // This is brain dead, but check we can actually serialize our annotation by trying it in memory
@@ -105,14 +104,18 @@ private[midas] case class EndpointIOAnnotation(
     channelMapping: Map[String, String],
     widget: Option[(Parameters) => EndpointWidget] = None,
     widgetClass: Option[String] = None,
-    widgetConstructorKey: Option[AnyRef] = None) extends SingleTargetAnnotation[ReferenceTarget] {
+    widgetConstructorKey: Option[_ <: AnyRef] = None) extends SingleTargetAnnotation[ReferenceTarget] {
   def duplicate(n: ReferenceTarget) = this.copy(target)
   def channelNames = channelMapping.map(_._2)
   def elaborateWidget(implicit p: Parameters): EndpointWidget = widget match {
     case Some(elaborator) => elaborator(p)
     case None =>
       val constructor = Class.forName(widgetClass.get).getConstructors()(0)
-      constructor.newInstance(widgetConstructorKey.get, p).asInstanceOf[EndpointWidget]
+      println(widgetClass)
+      (widgetConstructorKey match {
+        case Some(key) => { println(widgetClass.get); constructor.newInstance(key, p) }
+        case None => { println("No Key Provided"); constructor.newInstance(p) }
+      }).asInstanceOf[EndpointWidget]
   }
 }
 
@@ -140,11 +143,9 @@ trait IsEndpoint {
   }
 }
 
-trait TypedEndpoint[CArg <: WidgetConstructorArgument,
-                    HPType <: TokenizedRecord,
-                    WidgetType <: TypedEndpointWidget[CArg, HPType]] {
+trait TypedEndpoint[HPType <: TokenizedRecord, WidgetType <: TypedEndpointWidget[HPType]] {
   self: BaseModule =>
-  def constructorArg: CArg
+  def constructorArg: Option[_ <: AnyRef]
   def endpointIO: HPType
 
   def generateAnnotations(): Unit = {
@@ -153,10 +154,10 @@ trait TypedEndpoint[CArg <: WidgetConstructorArgument,
     val mirror = ru.runtimeMirror(getClass.getClassLoader)
     val classType = mirror.classSymbol(getClass)
     // The base class here is TypedEndpoint, but it has not yet been parameterized. 
-    val baseClassType = ru.typeOf[TypedEndpoint[_,_,_]].typeSymbol.asClass
+    val baseClassType = ru.typeOf[TypedEndpoint[_,_]].typeSymbol.asClass
     // Now this will be the type-parameterized form of TypedEndpoint
     val baseType = ru.internal.thisType(classType).baseType(baseClassType)
-    val widgetClassSymbol = baseType.typeArgs(2).typeSymbol.asClass
+    val widgetClassSymbol = baseType.typeArgs(1).typeSymbol.asClass
 
     // Generate the endpoint annotation
     annotate(new ChiselAnnotation { def toFirrtl = {
@@ -165,7 +166,7 @@ trait TypedEndpoint[CArg <: WidgetConstructorArgument,
           endpointIO.allChannelNames,
           widgetClass = widgetClassSymbol.fullName,
           widgetConstructorKey = constructorArg)
-        //anno.checkSerializability
+        anno.checkSerializability
         anno
       }
     })

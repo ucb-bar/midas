@@ -184,7 +184,6 @@ abstract class TimingModel(val cfg: BaseConfig)(implicit val p: Parameters) exte
   }
 }
 
-
 // A class of simple timing models that has independently programmable bounds on
 // the number of reads and writes the model will accept.
 //

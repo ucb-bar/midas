@@ -16,6 +16,7 @@ import chisel3.experimental.dontTouch
 import midas.core._
 import midas.widgets._
 import midas.passes.{Fame1ChiselAnnotation}
+import midas.passes.fame.{HasSerializationHints}
 
 import scala.math.min
 import Console.{UNDERLINED, RESET}
@@ -175,14 +176,14 @@ class MemModelIO(implicit val p: Parameters) extends WidgetIO()(p){
 
 // Need to wrap up all the parameters in a case class for serialization. The edge and width
 // were previously passed in via the target's Parameters object
-case class CompleteConfig[T <: BaseConfig](
-    userProvided: T,
+case class CompleteConfig(
+    userProvided: BaseConfig,
     axi4Widths: NastiParameters,
-    axi4Edge: Option[AXI4EdgeSummary] = None) extends WidgetConstructorArgument {
-  override def additionalTypeHints(): Seq[Class[_]] = Seq(userProvided.getClass)
+    axi4Edge: Option[AXI4EdgeSummary] = None) extends HasSerializationHints {
+  def typeHints(): Seq[Class[_]] = Seq(userProvided.getClass)
 }
 
-class FASEDMemoryTimingModel(completeConfig: CompleteConfig[_ <: BaseConfig], hostParams: Parameters) extends TypedEndpointWidget[CompleteConfig[_ <: BaseConfig], HostPortIO[FASEDTargetIO]]()(hostParams) {
+class FASEDMemoryTimingModel(completeConfig: CompleteConfig, hostParams: Parameters) extends TypedEndpointWidget[HostPortIO[FASEDTargetIO]]()(hostParams) {
   val cfg = completeConfig.userProvided
   // Reconstitute the parameters object
   implicit override val p = hostParams.alterPartial({
@@ -557,15 +558,16 @@ class FASEDMemoryTimingModel(completeConfig: CompleteConfig[_ <: BaseConfig], ho
   }
 }
 
-class FASEDEndpoint(val constructorArg: CompleteConfig[_ <: BaseConfig])(implicit p: Parameters)
-    extends BlackBox with TypedEndpoint[CompleteConfig[_ <: BaseConfig], HostPortIO[FASEDTargetIO], FASEDMemoryTimingModel] {
+class FASEDEndpoint(argument: CompleteConfig)(implicit p: Parameters)
+    extends BlackBox with TypedEndpoint[HostPortIO[FASEDTargetIO], FASEDMemoryTimingModel] {
   val io = IO(new FASEDTargetIO)
   val endpointIO = HostPort(io)
+  val constructorArg = Some(argument)
   generateAnnotations()
 }
 
 object FASEDEndpoint {
-  def apply(axi4: AXI4Bundle, reset: Bool, cfg: CompleteConfig[_ <: BaseConfig])(implicit p: Parameters): FASEDEndpoint = {
+  def apply(axi4: AXI4Bundle, reset: Bool, cfg: CompleteConfig)(implicit p: Parameters): FASEDEndpoint = {
     val ep = Module(new FASEDEndpoint(cfg))
     ep.io.reset := reset
     import chisel3.core.ExplicitCompileOptions.NotStrict

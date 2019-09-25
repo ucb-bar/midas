@@ -13,11 +13,18 @@ import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization
 import org.json4s.native.Serialization.{read, writePretty}
 
+case class DeserializationTypeHintsAnnotation(typeTags: Seq[String]) extends NoTargetAnnotation
+
+trait HasSerializationHints {
+  // For serialization of complicated constuctor arguments, let the endpoint
+  // designer specify additional type hints for relevant classes that might be
+  // contained within
+  def typeHints(): Seq[Class[_]]
+}
+
 object JsonProtocol {
   import firrtl.annotations.JsonProtocol._
 
-  val fameChannelInfoClasses = Seq(classOf[PipeChannel], classOf[DecoupledForwardChannel], DecoupledReverseChannel.getClass,
-    classOf[midas.models.BaseConfig], classOf[midas.models.CompleteConfig[_]])
   /** Construct Json formatter for annotations */
   def jsonFormat(tags: Seq[Class[_]]) = {
     Serialization.formats(FullTypeHints(tags.toList)).withTypeHintFieldName("class") +
@@ -32,13 +39,13 @@ object JsonProtocol {
   def serialize(annos: Seq[Annotation]): String = serializeTry(annos).get
 
   def serializeTry(annos: Seq[Annotation]): Try[String] = {
-    val tags = annos.map(_.getClass).distinct
-    val endpointTags = annos.collect({
-      case SerializableEndpointAnnotation(_, _, _, epKey) => epKey.getClass +: epKey.additionalTypeHints
-    }).flatten.distinct ++ fameChannelInfoClasses
+    val tags = annos.flatMap({
+      case anno: HasSerializationHints => anno.getClass +: anno.typeHints
+      case other => Seq(other.getClass)
+    }).distinct
 
-    implicit val formats = jsonFormat(tags ++ endpointTags)
-    Try(writePretty(annos))
+    implicit val formats = jsonFormat(classOf[DeserializationTypeHintsAnnotation] +: tags)
+    Try(writePretty(DeserializationTypeHintsAnnotation(tags.map(_.getName)) +: annos))
   }
 
   def deserialize(in: JsonInput): Seq[Annotation] = deserializeTry(in).get
@@ -51,11 +58,13 @@ object JsonProtocol {
         s"Annotations must be serialized as a JArray, got ${x.getClass.getSimpleName} instead!")
     }
     // Gather classes so we can deserialize arbitrary Annotations
-    val classes = annos.map({
-      case JObject(("class", JString(c)) :: tail) => c
+    val classes = annos.flatMap({
+      case JObject(("class", JString(typeHintAnnoName)) :: ("typeTags", JArray(classes)) :: Nil) =>
+          typeHintAnnoName +: classes.collect({ case JString(className) => className })
+      case JObject(("class", JString(c)) :: tail) => Seq(c)
       case obj => throw new InvalidAnnotationJSONException(s"Expected field 'class' not found! $obj")
     }).distinct
-    val loaded = classes.map(Class.forName(_).asInstanceOf[Class[_ <: Annotation]]) ++ fameChannelInfoClasses
+    val loaded = classes.map(Class.forName(_).asInstanceOf[Class[_ <: Annotation]])
 
     implicit val formats = jsonFormat(loaded)
     read[List[Annotation]](in)

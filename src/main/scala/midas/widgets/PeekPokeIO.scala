@@ -24,9 +24,9 @@ class PeekPokeWidgetIO(implicit val p: Parameters) extends WidgetIO()(p) {
 }
 
 case class PeekPokeKey(
-  peeks: Seq[SerializableField],
-  pokes: Seq[SerializableField],
-  maxChannelDecoupling: Int = 2) extends WidgetConstructorArgument
+    peeks: Seq[SerializableField],
+    pokes: Seq[SerializableField],
+    maxChannelDecoupling: Int = 2)
 
 object PeekPokeKey {
   def apply(targetIO: Record): PeekPokeKey = {
@@ -39,7 +39,7 @@ object PeekPokeKey {
 
 // Maximum channel decoupling puts a bound on the number of cycles the fastest
 // channel can advance ahead of the slowest channel
-class PeekPokeWidget(key: PeekPokeKey)(implicit p: Parameters) extends TypedEndpointWidget[PeekPokeKey, PeekPokeTokenizedIO] {
+class PeekPokeWidget(key: PeekPokeKey)(implicit p: Parameters) extends TypedEndpointWidget[PeekPokeTokenizedIO] {
   val io = IO(new PeekPokeWidgetIO)
   val hPort = IO(PeekPokeTokenizedIO(key))
 
@@ -210,9 +210,9 @@ class PeekPokeTargetIO(targetIO: Seq[(String, Data)], withReset: Boolean) extend
 }
 
 class PeekPokeEndpoint(targetIO: Seq[(String, Data)], reset: Option[Bool]) extends BlackBox
-    with TypedEndpoint[PeekPokeKey, PeekPokeTokenizedIO, PeekPokeWidget] {
+    with TypedEndpoint[PeekPokeTokenizedIO, PeekPokeWidget] {
   val io = IO(new PeekPokeTargetIO(targetIO, reset != None))
-  val constructorArg = PeekPokeKey(io)
+  val constructorArg = Some(PeekPokeKey(io))
   val endpointIO = new PeekPokeTokenizedIO(io)
   generateAnnotations()
 }
