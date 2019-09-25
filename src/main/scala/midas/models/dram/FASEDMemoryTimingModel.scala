@@ -568,7 +568,7 @@ class FASEDEndpoint(argument: CompleteConfig)(implicit p: Parameters)
 
 object FASEDEndpoint {
   def apply(axi4: AXI4Bundle, reset: Bool, cfg: CompleteConfig)(implicit p: Parameters): FASEDEndpoint = {
-    val ep = Module(new FASEDEndpoint(cfg))
+    val ep = Module(new FASEDEndpoint(cfg)(p.alterPartial({ case NastiKey => cfg.axi4Widths })))
     ep.io.reset := reset
     import chisel3.core.ExplicitCompileOptions.NotStrict
     ep.io.axi4 <> axi4

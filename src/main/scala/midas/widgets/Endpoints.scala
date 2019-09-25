@@ -161,13 +161,11 @@ trait TypedEndpoint[HPType <: TokenizedRecord, WidgetType <: TypedEndpointWidget
 
     // Generate the endpoint annotation
     annotate(new ChiselAnnotation { def toFirrtl = {
-        val anno = SerializableEndpointAnnotation(
+        SerializableEndpointAnnotation(
           self.toNamed.toTarget,
           endpointIO.allChannelNames,
           widgetClass = widgetClassSymbol.fullName,
           widgetConstructorKey = constructorArg)
-        anno.checkSerializability
-        anno
       }
     })
     // Emit annotations to capture channel information
