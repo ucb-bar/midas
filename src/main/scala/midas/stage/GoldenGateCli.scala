@@ -7,6 +7,8 @@ import firrtl.options.Shell
 trait GoldenGateCli { this: Shell =>
   parser.note("Golden Gate Compiler Options")
   Seq(GoldenGateInputAnnotationFileAnnotation,
+      ConfigPackageAnnotation,
+      ConfigStringAnnotation,
       firrtl.stage.FirrtlFileAnnotation,
       firrtl.stage.OutputFileAnnotation,
       firrtl.stage.FirrtlSourceAnnotation,
