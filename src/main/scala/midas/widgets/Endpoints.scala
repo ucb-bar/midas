@@ -110,11 +110,13 @@ private[midas] case class EndpointIOAnnotation(
   def elaborateWidget(implicit p: Parameters): EndpointWidget = widget match {
     case Some(elaborator) => elaborator(p)
     case None =>
+      println(s"Instantiating endpoint ${target.ref} of type ${widgetClass.get}")
       val constructor = Class.forName(widgetClass.get).getConstructors()(0)
-      println(widgetClass)
       (widgetConstructorKey match {
-        case Some(key) => { println(widgetClass.get); constructor.newInstance(key, p) }
-        case None => { println("No Key Provided"); constructor.newInstance(p) }
+        case Some(key) =>
+          println(s"  With constructor arguments: $key")
+          constructor.newInstance(key, p)
+        case None => constructor.newInstance(p)
       }).asInstanceOf[EndpointWidget]
   }
 }
