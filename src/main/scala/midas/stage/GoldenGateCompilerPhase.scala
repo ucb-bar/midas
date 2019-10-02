@@ -39,8 +39,8 @@ class GoldenGateCompilerPhase extends Phase {
       case OutputDir => targetDir
     })
 
-    val targetTransforms = p(TargetTransforms) // Ran prior to Golden Gate tranforms (target-time)
-    val hostTransforms = p(HostTransforms) // Ran after Golden Gate transformations (host-time)
+    val targetTransforms = p(TargetTransforms).flatMap(transformCtor => transformCtor(p)) // Ran prior to Golden Gate tranforms (target-time)
+    val hostTransforms = p(HostTransforms).flatMap(transformCtor => transformCtor(p)) // Ran after Golden Gate transformations (host-time)
     val midasTransforms = new passes.MidasTransforms(io)
     val compiler = new MidasCompiler
     val midas = compiler.compile(firrtl.CircuitState(
