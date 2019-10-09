@@ -83,7 +83,7 @@ class LLCProgrammableSettings(llcKey: LLCParams) extends Bundle
   val registers = Seq(
     wayBits     -> RuntimeSetting(llcKey.ways.maxBits, "Log2(ways per set)"),
     setBits     -> RuntimeSetting(llcKey.sets.maxBits, "Log2(sets per bank"),
-    blockBits   -> RuntimeSetting(llcKey.blockBytes.maxBits, "Log2(cache-block bytes"),
+    blockBits   -> RuntimeSetting(6, "Log2(cache-block bytes"), // 64B is the typical line length in RC
     activeMSHRs -> RuntimeSetting(llcKey.mshrs.max, "Number of MSHRs", min = 1, max = Some(llcKey.mshrs.max))
   )
 
@@ -96,8 +96,8 @@ class LLCProgrammableSettings(llcKey: LLCParams) extends Bundle
   def setLLCSettings(bytesPerBlock: Option[Int] = None): Unit = {
     Console.println(s"\n${UNDERLINED}Last-Level Cache Settings${RESET}")
 
-    regMap(blockBits).set(log2Ceil(requestInput("Block size in bytes",
-                                                default = llcKey.blockBytes.max,
+    regMap(blockBits).set(log2Ceil(requestInput("Block size in bytes (must be a power of two)",
+                                                default = 64,
                                                 min     = Some(llcKey.blockBytes.min),
                                                 max     = Some(llcKey.blockBytes.max))))
     regMap(setBits).set(log2Ceil(requestInput("Number of sets in LLC",
