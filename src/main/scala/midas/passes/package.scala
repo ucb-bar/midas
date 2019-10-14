@@ -52,6 +52,14 @@ package object passes {
     }
   }
 
+  /**
+    * This pass ensures that the AbstractClockGate blackbox is defined in a circuit, so that it can
+    * later be instantiated. The blackbox clock gate has the following signature:
+    * 
+    * module AbstractClockGate(input I, input CE, output O);
+    * 
+    * I and O are the input and output clocks, respectively, while CE is the enable signal.
+    */
   object DefineAbstractClockGate extends Transform with FunctionalPass[CircuitName] {
     val blackboxName = "AbstractClockGate"
     val blackbox = ExtModule(
@@ -88,38 +96,91 @@ package object passes {
     }
   }
 
+  /**
+    * Adds a default to a partial function.
+    */
   object OrElseIdentity {
+    /**
+      * Transforms a partial function with matching input and output types into a total function. In
+      * cases where the partial function is not defined, the identity function is used.
+      * 
+      * @tparam T The type for both the input and output of the partial function
+      * @param f The partial function to transform
+      * @return Returns a total function (T) => T
+      */
     def apply[T](f: PartialFunction[T, T]): T => T = {
       f.orElse({ case x => x }: PartialFunction[T, T])
     }
   }
 
+  /**
+    * Generates a function transforming a circuit from a partial function describing how each
+    * module, if matched, is transformed.
+    */
   object ModuleTransformer {
+    /**
+      * @param f A partial function that transforms matched modules
+      * @return Returns a function that applies the input function to each module in the circuit
+      */
     def apply(f: PartialFunction[DefModule, DefModule]): Circuit => Circuit = {
       c => c mapModule OrElseIdentity(f)
     }
   }
 
+  /**
+    * Generates a function transforming a circuit from a partial function describing how each
+    * statement, if matched, is transformed. This is applied recursively to all statements in the
+    * circuit.
+    */
   object StatementTransformer {
+    /**
+      * @param f A partial function that transforms matched statements
+      * @return Returns a function that recursively applies the input function to each statement in the circuit
+      */
     def apply(f: PartialFunction[Statement, Statement]): Circuit => Circuit = {
       val fTotal = OrElseIdentity(f)
       ModuleTransformer { case m => m mapStmt { s => fTotal(s mapStmt fTotal) } }
     }
   }
 
+  /**
+    * Generates a function transforming a circuit from a partial function describing how each
+    * expression, if matched, is transformed. This is applied recursively to all expressions in the
+    * circuit.
+    */
   object ExpressionTransformer {
+    /**
+      * @param f A partial function that transforms matched expressions
+      * @return Returns a function that recursively applies the input function to each expression in the circuit
+      */
     def apply(f: PartialFunction[Expression, Expression]): Circuit => Circuit = {
       val fTotal = OrElseIdentity(f)
       StatementTransformer { case s => s mapExpr { e => fTotal(e mapExpr fTotal) } }
     }
   }
 
+  /**
+    * A utility for matching and replacing FIRRTL expression trees
+    */
   object ReplaceExpression {
-    type ReplMap = Map[WrappedExpression, Expression]
-    private def onExpr(repls: ReplMap)(e: Expression): Expression = repls.getOrElse(we(e), e map onExpr(repls))
-    def apply(repls: ReplMap)(s: Statement): Statement = s map apply(repls) map onExpr(repls)
+    private def onExpr(repls: Map[WrappedExpression, Expression])(e: Expression): Expression = repls.getOrElse(we(e), e map onExpr(repls))
+    /**
+      * Recursively replace expressions in a Statement tree according to a map. Since the keys are
+      * of type WrappedExpression, the matching is based on "WrappedExpression equality," which
+      * ignores metadata that may be present in the nodes, like info, type, or kind.
+      * 
+      * @param repls A map defining how each expression (in wrapped form) is replaced by a matching value, if any
+      * @param s The input statement to transform
+      * @return Returns a statement tree transformed by substitution according to the replacement map
+      */
+    def apply(repls: Map[WrappedExpression, Expression])(s: Statement): Statement = s map apply(repls) map onExpr(repls)
   }
 
+  /**
+    * A pass that is described as a chain of pure function calls.
+    * 
+    * @tparam T The type of the analysis object returned by the analysis phase.
+    */
   trait FunctionalPass[T] {
     def inputForm: CircuitForm = UnknownForm
     def outputForm: CircuitForm = UnknownForm
@@ -128,10 +189,27 @@ package object passes {
       case _ => outputForm
     }
 
+    /**
+      * Examine the circuit and store information in an analysis object
+      */
     def analyze(cs: CircuitState): T
-    def preTransformCheck(analysis: T): Unit = ()
+
+    /**
+      * @param analysis The results of the analysis pass
+      * @return Returns a function that, when called, transformes the circuit
+      */
     def transformer(analysis: T): Circuit => Circuit
+
+    /**
+      * @param analysis The results of the analysis pass
+      * @return Returns a function that, when called, transformes the annotations
+      */
     def annotater(analysis: T): AnnotationSeq => AnnotationSeq
+
+    /**
+      * @param analysis The results of the analysis pass
+      * @return Returns a RenameMap that, when applied, appropriately transforms targets
+      */
     def renamer(analysis: T): Option[RenameMap] = None
 
     final def execute(input: CircuitState): CircuitState = {
@@ -142,6 +220,9 @@ package object passes {
     }
   }
 
+  /**
+    * A pass that simply applies a (Circuit) => Circuit function.
+    */
   trait NoAnalysisPass extends FunctionalPass[Unit] {
     final def analyze(cs: CircuitState): Unit = ()
     final def transformer(analysis: Unit): Circuit => Circuit = transformer
