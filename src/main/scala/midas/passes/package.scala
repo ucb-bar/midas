@@ -211,7 +211,7 @@ package object passes {
 
     /**
       * @param analysis The results of the analysis pass
-      * @return Returns a function that, when called, transformes the circuit
+      * @return Returns a function that, when called, transforms the circuit
       */
     def transformer(analysis: T): Circuit => Circuit
 
