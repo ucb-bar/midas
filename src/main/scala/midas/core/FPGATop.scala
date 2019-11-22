@@ -131,6 +131,8 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
   case class DmaInfo(name: String, port: NastiIO, size: BigInt)
   val dmaInfoBuffer = new ListBuffer[DmaInfo]
 
+  val trace_trigger = Wire(Bool())
+
   // Instantiate endpoint widgets
   defaultIOWidget.io.tReset.ready := (simIo.endpoints foldLeft true.B) { (resetReady, endpoint) =>
     ((0 until endpoint.size) foldLeft resetReady) { (ready, i) =>
@@ -152,6 +154,16 @@ class FPGATop(simIoType: SimWrapperIO)(implicit p: Parameters) extends Module wi
 
       widget match {
         case widget: HasDMA => dmaInfoBuffer += DmaInfo(widgetName, widget.dma, widget.dmaSize)
+        case _ => Nil
+      }
+
+      endpoint.hasTrace match {
+        case true => trace_trigger := widget.io.trigger_out.head
+        case _ => Nil
+      }
+
+      endpoint.hasPrint match {
+        case true => widget.io.trigger_in.head := trace_trigger
         case _ => Nil
       }
 

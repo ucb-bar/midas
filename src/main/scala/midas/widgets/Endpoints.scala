@@ -31,9 +31,11 @@ import scala.collection.mutable.{ArrayBuffer, HashSet}
  * by token
  */
 
-abstract class EndpointWidgetIO(implicit p: Parameters) extends WidgetIO()(p) {
+abstract class EndpointWidgetIO(hasPrint: Boolean = false, hasTrace: Boolean = false)(implicit p: Parameters) extends WidgetIO()(p) {
   def hPort: HostPortIO[Data] // Tokenized port moving between the endpoint the target-RTL
   val tReset = Flipped(Decoupled(Bool()))
+  val trigger_out = Output(Vec(Bool(),if (hasTrace) 1 else 0))
+  val trigger_in = Input(Vec(Bool(),if (hasPrint) 1 else 0))
 }
 
 abstract class EndpointWidget(implicit p: Parameters) extends Widget()(p) {
@@ -44,6 +46,8 @@ abstract class EndpointWidget(implicit p: Parameters) extends Widget()(p) {
 trait Endpoint {
   protected val channels = ArrayBuffer[(String, Record)]()
   protected val wires = HashSet[Bits]()
+  var hasPrint = false
+  var hasTrace = false
   def clockRatio: IsRationalClockRatio = UnityClockRatio
   def matchType(data: Data): Boolean
   def widget(p: Parameters): EndpointWidget

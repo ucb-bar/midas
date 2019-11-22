@@ -55,6 +55,8 @@ class PrintRecordEndpoint extends Endpoint {
   var initialized = false
   var printRecordGen: PrintRecordBag = new PrintRecordBag("dummy", Seq())
 
+  hasPrint = true
+
   def matchType(data: Data) = data match {
     case channel: PrintRecordBag =>
       require(DataMirror.directionOf(channel) == Direction.Output, "PrintRecord has unexpected direction")
@@ -70,7 +72,7 @@ class PrintRecordEndpoint extends Endpoint {
   override def widgetName = "PrintWidget"
 }
 
-class PrintWidgetIO(private val record: PrintRecordBag)(implicit p: Parameters) extends EndpointWidgetIO()(p) {
+class PrintWidgetIO(private val record: PrintRecordBag)(implicit p: Parameters) extends EndpointWidgetIO(hasPrint = true)(p) {
   val hPort = Flipped(HostPort(record))
 }
 
@@ -135,7 +137,7 @@ class PrintWidget(printRecord: PrintRecordBag)(implicit p: Parameters) extends E
   // PAYLOAD HANDLING
   // TODO: Gating the prints using reset should be done by the transformation,
   // (using a predicate carried by the annotation(?))
-  val valid = printPort.hasEnabledPrint && !io.tReset.bits
+  val valid = printPort.hasEnabledPrint && !io.tReset.bits && io.trigger_in.head
   val data = Cat(printPort.asUInt, valid) | 0.U(pow2Bits.W)
 
   // Delay the valid token by a cycle so that we can first enqueue an idle-cycle-encoded token
